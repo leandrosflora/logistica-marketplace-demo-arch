@@ -1,0 +1,39 @@
+@startuml
+title 16 - Fluxo Alternativo - Exceção na Entrega e Notificação
+
+autonumber
+participant "Carrier/Provider" as Provider
+queue "Kafka" as Kafka
+participant "Tracking Service" as Tracking
+database "Tracking DB" as TrackingDb
+participant "Order Service" as Order
+participant "Notification Service" as Notification
+actor Buyer as Comprador
+
+Provider -> Kafka: CarrierTrackingEventIntegrationEvent status=Exception
+Kafka -> Tracking: Consome evento do carrier
+activate Tracking
+Tracking -> TrackingDb: Verifica inbox e providerEventId
+Tracking -> TrackingDb: Persiste TrackingEvent
+Tracking -> TrackingDb: Atualiza ShipmentTracking para Exception
+Tracking -> Kafka: TrackingStatusChangedIntegrationEvent currentStatus=Exception
+deactivate Tracking
+
+Kafka -> Order: TrackingStatusChangedIntegrationEvent
+activate Order
+Order -> Order: Avalia impacto no pedido
+alt Exceção recuperável
+  Order -> Order: Mantém pedido ativo
+else Exceção terminal
+  Order -> Order: Marca pedido em análise operacional
+end
+deactivate Order
+
+Kafka -> Notification: TrackingStatusChangedIntegrationEvent currentStatus=Exception
+activate Notification
+Notification -> Notification: Mapeia para DeliveryException
+Notification -> Notification: Aplica preferência do comprador
+Notification --> Comprador: Notifica problema na entrega e próxima ação
+deactivate Notification
+
+@enduml
