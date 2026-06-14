@@ -63,9 +63,17 @@ Principais tópicos:
 
 ## Diagramas
 
-- [`docs/c4/meli-envios-context.puml`](docs/c4/meli-envios-context.puml)
-- [`docs/c4/meli-envios-container.puml`](docs/c4/meli-envios-container.puml)
-- [`docs/sequence-diagrams/quote-shipping.puml`](docs/sequence-diagrams/quote-shipping.puml)
+### C4
+
+- Fonte: [`docs/c4/meli-envios-context.puml`](docs/c4/meli-envios-context.puml)
+- Imagem: [`docs/c4/meli-envios-context.svg`](docs/c4/meli-envios-context.svg)
+- Fonte: [`docs/c4/meli-envios-container.puml`](docs/c4/meli-envios-container.puml)
+- Imagem: [`docs/c4/meli-envios-container.svg`](docs/c4/meli-envios-container.svg)
+
+### Sequence diagrams
+
+- Fonte: [`docs/sequence-diagrams/quote-shipping.puml`](docs/sequence-diagrams/quote-shipping.puml)
+- Imagem: [`docs/sequence-diagrams/quote-shipping.svg`](docs/sequence-diagrams/quote-shipping.svg)
 
 ## ADRs
 
@@ -89,6 +97,12 @@ Validar PlantUML:
 
 ```bash
 docker run --rm -v "$PWD:/work" plantuml/plantuml -checkmetadata /work/docs/c4/*.puml /work/docs/sequence-diagrams/*.puml
+```
+
+Gerar imagens SVG dos diagramas:
+
+```bash
+docker run --rm -v "$PWD:/work" plantuml/plantuml -tsvg /work/docs/c4/*.puml /work/docs/sequence-diagrams/*.puml
 ```
 
 ## Como usar com Codex
