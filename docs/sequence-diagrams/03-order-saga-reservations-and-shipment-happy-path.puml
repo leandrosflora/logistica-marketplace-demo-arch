@@ -1,0 +1,65 @@
+@startuml
+title 03 - Saga do Pedido, Reservas e Shipment - Fluxo Feliz
+
+autonumber
+queue "Kafka" as Kafka
+participant "Order Service" as Order
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Shipment Service" as Shipment
+participant "Carrier Service" as Carrier
+database "Order DB" as OrderDb
+
+Kafka -> Order: CheckoutConfirmedIntegrationEvent
+activate Order
+Order -> OrderDb: Cria pedido em status Pending
+Order -> Kafka: ReserveInventoryCommand
+Order -> Kafka: ReserveFulfillmentCapacityCommand
+deactivate Order
+
+Kafka -> Inventory: ReserveInventoryCommand
+activate Inventory
+Inventory -> Inventory: Valida saldo disponível
+Inventory -> Inventory: Cria reserva Pending
+Inventory -> Kafka: InventoryReservedIntegrationEvent
+deactivate Inventory
+
+Kafka -> FC: ReserveFulfillmentCapacityCommand
+activate FC
+FC -> FC: Valida capacidade disponível
+FC -> FC: Cria reserva Pending
+FC -> Kafka: FulfillmentCapacityReservedIntegrationEvent
+deactivate FC
+
+Kafka -> Order: InventoryReservedIntegrationEvent
+Kafka -> Order: FulfillmentCapacityReservedIntegrationEvent
+activate Order
+Order -> OrderDb: Marca reservas como recebidas
+Order -> Kafka: ConfirmInventoryReservationCommand
+Order -> Kafka: ConfirmFulfillmentCapacityCommand
+Order -> Kafka: CreateShipmentCommand
+deactivate Order
+
+Kafka -> Inventory: ConfirmInventoryReservationCommand
+Inventory -> Kafka: InventoryReservationConfirmedIntegrationEvent
+Kafka -> FC: ConfirmFulfillmentCapacityCommand
+FC -> Kafka: FulfillmentCapacityConfirmedIntegrationEvent
+
+Kafka -> Shipment: CreateShipmentCommand
+activate Shipment
+Shipment -> Shipment: Aplica inbox/idempotência
+Shipment -> Shipment: Cria shipment PendingCarrierBooking
+Shipment -> Carrier: Booking de shipment / geração de etiqueta
+Carrier --> Shipment: Tracking code + label
+Shipment -> Shipment: Marca shipment ReadyToShip
+Shipment -> Kafka: ShipmentCreatedIntegrationEvent
+deactivate Shipment
+
+Kafka -> Order: ShipmentCreatedIntegrationEvent
+activate Order
+Order -> OrderDb: Registra shipmentId no pedido
+Order -> OrderDb: Atualiza saga para etapa logística criada
+Order -> Kafka: OrderConfirmedIntegrationEvent
+deactivate Order
+
+@enduml
