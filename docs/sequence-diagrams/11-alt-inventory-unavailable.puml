@@ -1,0 +1,36 @@
+@startuml
+title 11 - Fluxo Alternativo - Estoque Indisponível
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Shipping Promise Service" as Promise
+participant "Product Catalog Service" as Catalog
+participant "Inventory Service" as Inventory
+participant "Checkout Service" as Checkout
+queue "Kafka" as Kafka
+
+Comprador -> FE: Solicita frete para produto
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?zipCode={cep}
+BFF -> Promise: POST /shipping-promises/
+Promise -> Catalog: POST /products/physical-info/batch
+Catalog --> Promise: Dados físicos do SKU
+Promise -> Inventory: POST /inventory/availability/batch
+Inventory --> Promise: availableQuantity=0
+Promise --> BFF: available=false, unavailableReason="No inventory available"
+BFF --> FE: Produto sem opção de entrega
+FE --> Comprador: Exibe indisponibilidade de estoque
+
+== Tentativa tardia durante confirmação ==
+Comprador -> FE: Tenta confirmar checkout antigo
+FE -> BFF: POST /api/web/v1/checkouts/{checkoutId}/confirm
+BFF -> Checkout: POST /checkouts/{checkoutId}/confirm
+Checkout -> Kafka: CheckoutConfirmedIntegrationEvent
+Kafka -> Inventory: ReserveInventoryCommand
+Inventory -> Inventory: Valida saldo insuficiente
+Inventory -> Kafka: InventoryReservationFailedIntegrationEvent
+Kafka -> Checkout: Evento de falha para auditoria/estado
+Kafka -> BFF: Sem resposta síncrona direta
+
+@enduml
