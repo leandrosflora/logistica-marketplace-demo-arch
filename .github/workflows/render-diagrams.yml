@@ -1,0 +1,66 @@
+name: Render PlantUML diagrams
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/c4/**/*.puml'
+      - 'docs/sequence-diagrams/**/*.puml'
+      - '.github/workflows/render-diagrams.yml'
+  pull_request:
+    paths:
+      - 'docs/c4/**/*.puml'
+      - 'docs/sequence-diagrams/**/*.puml'
+      - '.github/workflows/render-diagrams.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  render-diagrams:
+    name: Render SVG diagrams from PlantUML
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Render PlantUML diagrams as SVG
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" \
+            plantuml/plantuml:latest \
+            -tsvg \
+            /work/docs/c4/*.puml \
+            /work/docs/sequence-diagrams/*.puml
+
+      - name: Show generated diagram changes
+        run: |
+          git status --short
+
+      - name: Fail PR when generated SVGs are out of date
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! git diff --quiet -- docs/c4 docs/sequence-diagrams; then
+            echo "Generated SVG files are out of date. Run the PlantUML render command locally and commit the changes."
+            git diff -- docs/c4 docs/sequence-diagrams
+            exit 1
+          fi
+
+      - name: Commit generated SVGs
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- docs/c4 docs/sequence-diagrams; then
+            echo "No generated diagram changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
+          git commit -m "chore: render PlantUML diagrams [skip ci]"
+          git push
