@@ -1,0 +1,1731 @@
+openapi: 3.0.3
+info:
+  title: Meli Envios - API Contracts
+  version: 1.0.0
+  description: >-
+    Contratos OpenAPI consolidados a partir dos READMEs e contratos públicos dos
+    repositórios envolvidos no case Meli Envios. Este arquivo é a visão canônica
+    para integração entre Frontend/BFF e microservices.
+servers:
+  - url: http://localhost
+    description: Base local genérica; cada serviço possui sua própria porta no repositório correspondente.
+tags:
+  - name: MarketplaceWeb.Bff
+  - name: ProductSearchService
+  - name: ProductCatalogService
+  - name: CheckoutService
+  - name: ShippingPromiseService
+  - name: InventoryService
+  - name: FulfillmentCenterService
+  - name: RoutingService
+  - name: CarrierService
+  - name: ShippingPricingService
+  - name: OrderService
+  - name: ShipmentService
+  - name: TrackingService
+  - name: NotificationService
+paths:
+  /api/web/v1/products/search:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Busca produtos para o canal web via BFF
+      parameters:
+        - $ref: '#/components/parameters/QueryText'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: zipCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: region
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Resultado paginado de produtos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductSearchResponse' }
+  /api/web/v1/products/{skuId}:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Consulta dados públicos de produto via BFF
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      responses:
+        '200':
+          description: Produto encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { description: Produto não encontrado }
+  /api/web/v1/products/{skuId}/page:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Retorna payload composto para página de produto
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+        - name: quantity
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 99, default: 1 }
+        - name: zipCode
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Página de produto composta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPageResponse' }
+  /api/web/v1/shipping-promises/:
+    post:
+      tags: [MarketplaceWeb.Bff]
+      summary: Calcula promessa de frete via BFF
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShippingPromiseRequest' }
+      responses:
+        '200':
+          description: Promessa calculada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingPromiseResponse' }
+  /api/web/v1/checkouts/:
+    post:
+      tags: [MarketplaceWeb.Bff]
+      summary: Cria checkout via BFF
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BffCreateCheckoutRequest' }
+      responses:
+        '201':
+          description: Checkout criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
+  /api/web/v1/checkouts/{checkoutId}:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Consulta checkout via BFF
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+      responses:
+        '200':
+          description: Checkout encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
+        '404': { description: Checkout não encontrado }
+  /api/web/v1/checkouts/{checkoutId}/confirm:
+    post:
+      tags: [MarketplaceWeb.Bff]
+      summary: Confirma checkout via BFF
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BffConfirmCheckoutRequest' }
+      responses:
+        '200':
+          description: Checkout confirmado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
+  /api/web/v1/orders/{orderId}:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Retorna página composta do pedido
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Página de pedido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPageResponse' }
+        '404': { description: Pedido não encontrado }
+  /api/web/v1/orders/{orderId}/cancel:
+    post:
+      tags: [MarketplaceWeb.Bff]
+      summary: Cancela pedido via BFF
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelOrderRequest' }
+      responses:
+        '202': { description: Cancelamento aceito }
+  /api/web/v1/orders/{orderId}/tracking:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Consulta tracking do pedido via BFF
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Tracking do pedido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackingResponse' }
+  /api/web/v1/shipments/{shipmentId}/label:
+    get:
+      tags: [MarketplaceWeb.Bff]
+      summary: Baixa etiqueta de expedição via BFF
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: Arquivo PDF da etiqueta
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404': { description: Etiqueta não encontrada }
+  /v1/products/search:
+    get:
+      tags: [ProductSearchService]
+      summary: Busca textual de produtos no índice materializado
+      parameters:
+        - $ref: '#/components/parameters/QueryText'
+        - $ref: '#/components/parameters/Page'
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: zipCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: region
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Resultado de busca
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductSearchResponse' }
+        '400': { description: Parâmetros inválidos }
+  /products/:
+    post:
+      tags: [ProductCatalogService]
+      summary: Cria produto/SKU
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProductRequest' }
+      responses:
+        '201':
+          description: Produto criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '409': { description: SKU já cadastrado }
+  /products/{skuId}:
+    get:
+      tags: [ProductCatalogService]
+      summary: Consulta produto por SKU
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      responses:
+        '200':
+          description: Produto encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { description: Produto não encontrado }
+  /products/physical-info/batch:
+    post:
+      tags: [ProductCatalogService]
+      summary: Consulta informações físicas de SKUs em lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductPhysicalInfoBatchRequest' }
+      responses:
+        '200':
+          description: Informações físicas encontradas
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProductPhysicalInfoResponse' }
+  /products/{skuId}/physical-info:
+    put:
+      tags: [ProductCatalogService]
+      summary: Atualiza informações físicas de SKU
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProductPhysicalInfoRequest' }
+      responses:
+        '200':
+          description: Produto atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { description: Produto não encontrado }
+  /products/{skuId}/status:
+    patch:
+      tags: [ProductCatalogService]
+      summary: Altera status de produto
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProductStatusRequest' }
+      responses:
+        '200':
+          description: Produto atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+  /checkouts:
+    post:
+      tags: [CheckoutService]
+      summary: Cria sessão de checkout
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCheckoutRequest' }
+      responses:
+        '201':
+          description: Checkout criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+  /checkouts/{checkoutId}:
+    get:
+      tags: [CheckoutService]
+      summary: Consulta checkout
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+      responses:
+        '200':
+          description: Checkout encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '404': { description: Checkout não encontrado }
+  /checkouts/{checkoutId}/confirm:
+    post:
+      tags: [CheckoutService]
+      summary: Confirma checkout
+      parameters:
+        - $ref: '#/components/parameters/CheckoutId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmCheckoutRequest' }
+      responses:
+        '200':
+          description: Checkout confirmado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+  /shipping-promises/:
+    post:
+      tags: [ShippingPromiseService]
+      summary: Calcula promessa de entrega
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShippingPromiseRequest' }
+      responses:
+        '200':
+          description: Promessa calculada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingPromiseResponse' }
+        '400': { description: Request inválido }
+  /inventory/availability/batch:
+    post:
+      tags: [InventoryService]
+      summary: Consulta disponibilidade em lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryAvailabilityBatchRequest' }
+      responses:
+        '200':
+          description: Saldos encontrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/InventoryAvailabilityResponse' }
+  /inventory/{sellerId}/{skuId}:
+    get:
+      tags: [InventoryService]
+      summary: Consulta disponibilidade de SKU por seller
+      parameters:
+        - $ref: '#/components/parameters/SellerId'
+        - $ref: '#/components/parameters/SkuId'
+      responses:
+        '200':
+          description: Saldos por fulfillment center
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/InventoryAvailabilityResponse' }
+  /inventory/reservations:
+    post:
+      tags: [InventoryService]
+      summary: Cria reserva de estoque
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateInventoryReservationRequest' }
+      responses:
+        '201':
+          description: Reserva criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
+  /inventory/reservations/{reservationId}/confirm:
+    post:
+      tags: [InventoryService]
+      summary: Confirma reserva de estoque
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+      responses:
+        '200':
+          description: Reserva confirmada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
+  /inventory/reservations/{reservationId}/release:
+    post:
+      tags: [InventoryService]
+      summary: Libera reserva de estoque
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+      responses:
+        '200':
+          description: Reserva liberada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
+  /inventory/adjustments:
+    post:
+      tags: [InventoryService]
+      summary: Ajusta estoque físico
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryAdjustmentRequest' }
+      responses:
+        '202': { description: Ajuste aceito }
+  /fulfillment-centers/candidates/search:
+    post:
+      tags: [FulfillmentCenterService]
+      summary: Busca fulfillment centers candidatos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FulfillmentCandidatesRequest' }
+      responses:
+        '200':
+          description: Centros candidatos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FulfillmentCandidateResponse' }
+  /fulfillment-centers/{fulfillmentCenterId}/capacity:
+    put:
+      tags: [FulfillmentCenterService]
+      summary: Configura capacidade operacional
+      parameters:
+        - $ref: '#/components/parameters/FulfillmentCenterId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateFulfillmentCapacityRequest' }
+      responses:
+        '204': { description: Capacidade atualizada }
+  /fulfillment-centers/{fulfillmentCenterId}/status:
+    patch:
+      tags: [FulfillmentCenterService]
+      summary: Altera status operacional do fulfillment center
+      parameters:
+        - $ref: '#/components/parameters/FulfillmentCenterId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateFulfillmentStatusRequest' }
+      responses:
+        '204': { description: Status atualizado }
+  /capacity-reservations/:
+    post:
+      tags: [FulfillmentCenterService]
+      summary: Cria reserva de capacidade
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCapacityReservationRequest' }
+      responses:
+        '201':
+          description: Reserva criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
+  /capacity-reservations/{reservationId}/confirm:
+    post:
+      tags: [FulfillmentCenterService]
+      summary: Confirma reserva de capacidade
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+      responses:
+        '200':
+          description: Reserva confirmada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
+  /capacity-reservations/{reservationId}/release:
+    post:
+      tags: [FulfillmentCenterService]
+      summary: Libera reserva de capacidade
+      parameters:
+        - $ref: '#/components/parameters/ReservationId'
+      responses:
+        '200':
+          description: Reserva liberada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
+  /routes/search:
+    post:
+      tags: [RoutingService]
+      summary: Busca rotas logísticas disponíveis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouteSearchRequest' }
+      responses:
+        '200':
+          description: Rotas encontradas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RouteSearchResponse' }
+        '503': { description: Grafo ainda não carregado }
+  /network/nodes:
+    post:
+      tags: [RoutingService]
+      summary: Cria nó logístico
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateLogisticsNodeRequest' }
+      responses:
+        '201': { description: Nó criado }
+  /network/lanes:
+    post:
+      tags: [RoutingService]
+      summary: Cria lane logística
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateLogisticsLaneRequest' }
+      responses:
+        '201': { description: Lane criada }
+  /network/lanes/{laneId}:
+    put:
+      tags: [RoutingService]
+      summary: Atualiza lane logística
+      parameters:
+        - name: laneId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateLogisticsLaneRequest' }
+      responses:
+        '200': { description: Lane atualizada }
+  /carriers:
+    post:
+      tags: [CarrierService]
+      summary: Cria transportadora
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierRequest' }
+      responses:
+        '201': { description: Transportadora criada }
+  /carriers/{carrierCode}:
+    get:
+      tags: [CarrierService]
+      summary: Consulta perfil de transportadora
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      responses:
+        '200':
+          description: Perfil encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CarrierProfileResponse' }
+        '404': { description: Transportadora não encontrada }
+  /carriers/{carrierCode}/status:
+    patch:
+      tags: [CarrierService]
+      summary: Altera status de transportadora
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateCarrierStatusRequest' }
+      responses:
+        '204': { description: Status atualizado }
+  /carriers/{carrierCode}/webhooks/status:
+    post:
+      tags: [CarrierService]
+      summary: Recebe webhook de status externo
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarrierStatusWebhookRequest' }
+      responses:
+        '202': { description: Webhook aceito }
+  /carriers/{carrierCode}/service-levels:
+    post:
+      tags: [CarrierService]
+      summary: Adiciona nível de serviço
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierServiceLevelRequest' }
+      responses:
+        '201': { description: Nível criado }
+  /carriers/{carrierCode}/lanes:
+    post:
+      tags: [CarrierService]
+      summary: Adiciona rota operacional da transportadora
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCarrierLaneRequest' }
+      responses:
+        '201': { description: Lane criada }
+  /carrier-availability/search:
+    post:
+      tags: [CarrierService]
+      summary: Consulta disponibilidade de transportadora em lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarrierAvailabilitySearchRequest' }
+      responses:
+        '200':
+          description: Resultado de disponibilidade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CarrierAvailabilitySearchResponse' }
+  /shipping-prices/quotes/batch:
+    post:
+      tags: [ShippingPricingService]
+      summary: Calcula cotações de frete para candidatos de rota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchShippingPriceRequest' }
+      responses:
+        '200':
+          description: Cotações calculadas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchShippingPriceResponse' }
+  /shipping-prices/quotes/{quoteId}:
+    get:
+      tags: [ShippingPricingService]
+      summary: Recupera cotação em cache
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Cotação encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingPriceQuoteResponse' }
+        '404': { description: Cotação inexistente ou expirada }
+  /rate-cards:
+    post:
+      tags: [ShippingPricingService]
+      summary: Cria rate card em rascunho
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RateCardRequest' }
+      responses:
+        '201':
+          description: Rate card criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateCardResponse' }
+  /rate-cards/{rateCardId}:
+    put:
+      tags: [ShippingPricingService]
+      summary: Atualiza rate card em rascunho
+      parameters:
+        - name: rateCardId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RateCardRequest' }
+      responses:
+        '200':
+          description: Rate card atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateCardResponse' }
+  /rate-cards/{rateCardId}/activate:
+    post:
+      tags: [ShippingPricingService]
+      summary: Ativa rate card
+      parameters:
+        - name: rateCardId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Rate card ativado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateCardResponse' }
+  /rate-cards/{rateCardId}/retire:
+    post:
+      tags: [ShippingPricingService]
+      summary: Aposenta rate card
+      parameters:
+        - name: rateCardId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Rate card aposentado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RateCardResponse' }
+  /orders/{orderId}:
+    get:
+      tags: [OrderService]
+      summary: Consulta pedido
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResponse' }
+        '404': { description: Pedido não encontrado }
+  /orders/{orderId}/cancel:
+    post:
+      tags: [OrderService]
+      summary: Cancela pedido
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelOrderRequest' }
+      responses:
+        '202': { description: Cancelamento aceito }
+        '400': { description: Idempotency-Key ausente }
+        '404': { description: Pedido não encontrado }
+  /shipments/{shipmentId}:
+    get:
+      tags: [ShipmentService]
+      summary: Consulta remessa
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: Remessa encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentResponse' }
+        '404': { description: Remessa não encontrada }
+  /shipments/{shipmentId}/label:
+    get:
+      tags: [ShipmentService]
+      summary: Gera URL temporária para etiqueta
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: URL temporária gerada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
+        '404': { description: Remessa ou etiqueta não encontrada }
+  /shipments/{shipmentId}/cancel:
+    post:
+      tags: [ShipmentService]
+      summary: Solicita cancelamento de remessa
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202': { description: Cancelamento aceito }
+        '409': { description: Status não permite cancelamento }
+  /tracking/shipments/{shipmentId}:
+    get:
+      tags: [TrackingService]
+      summary: Consulta tracking por shipmentId
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: Tracking encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackingResponse' }
+        '404': { description: Remessa não encontrada }
+  /tracking/{trackingCode}:
+    get:
+      tags: [TrackingService]
+      summary: Consulta tracking por código de rastreio
+      parameters:
+        - name: trackingCode
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tracking encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackingResponse' }
+        '404': { description: Código não encontrado }
+  /tracking/shipments/{shipmentId}/events:
+    get:
+      tags: [TrackingService]
+      summary: Consulta histórico de eventos de tracking
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: before
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Eventos de tracking
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TrackingEventResponse' }
+  /notifications/{notificationId}:
+    get:
+      tags: [NotificationService]
+      summary: Consulta notificação
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Notificação encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationResponse' }
+        '404': { description: Notificação não encontrada }
+  /notifications/tracking-status-changed:
+    post:
+      tags: [NotificationService]
+      summary: Recebe evento de alteração de tracking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrackingStatusChangedEvent' }
+      responses:
+        '202': { description: Evento aceito }
+  /notification-preferences/{recipientId}/{type}/{channel}:
+    put:
+      tags: [NotificationService]
+      summary: Cria ou atualiza preferência de notificação
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+        - name: channel
+          in: path
+          required: true
+          schema: { type: string, enum: [Email, Sms, Push] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '204': { description: Preferência atualizada }
+  /providers/{provider}/receipts:
+    post:
+      tags: [NotificationService]
+      summary: Recebe receipt de provider
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProviderReceiptRequest' }
+      responses:
+        '202': { description: Receipt aceito }
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1 }
+    QueryText:
+      name: query
+      in: query
+      required: true
+      schema: { type: string, minLength: 1 }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SkuId:
+      name: skuId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SellerId:
+      name: sellerId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CheckoutId:
+      name: checkoutId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ShipmentId:
+      name: shipmentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ReservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FulfillmentCenterId:
+      name: fulfillmentCenterId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CarrierCode:
+      name: carrierCode
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    Address:
+      type: object
+      required: [zipCode, city, state, country]
+      properties:
+        zipCode: { type: string }
+        city: { type: string }
+        state: { type: string }
+        country: { type: string, example: BR }
+    Dimensions:
+      type: object
+      required: [heightCm, widthCm, lengthCm]
+      properties:
+        heightCm: { type: number, format: decimal, minimum: 0 }
+        widthCm: { type: number, format: decimal, minimum: 0 }
+        lengthCm: { type: number, format: decimal, minimum: 0 }
+    PackageProfile:
+      type: object
+      properties:
+        weightKg: { type: number, format: decimal }
+        cubicWeightKg: { type: number, format: decimal }
+        actualWeightKg: { type: number, format: decimal }
+        totalWeightKg: { type: number, format: decimal }
+        heightCm: { type: number, format: decimal }
+        widthCm: { type: number, format: decimal }
+        lengthCm: { type: number, format: decimal }
+        isFragile: { type: boolean }
+        isRestricted: { type: boolean }
+        hasFragileItem: { type: boolean }
+        hasRestrictedItem: { type: boolean }
+        category: { type: string, nullable: true }
+    ProductCardResponse:
+      type: object
+      properties:
+        productId: { type: string }
+        title: { type: string }
+        imageUrl: { type: string, format: uri }
+        price: { type: number, format: decimal }
+        sellerId: { type: string }
+        availableQuantity: { type: integer }
+        rating: { type: number, format: double, nullable: true }
+        freeShipping: { type: boolean }
+        fulfillment: { type: boolean }
+        shippingPromise: { type: string, nullable: true }
+    ProductSearchResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProductCardResponse' }
+        pagination:
+          type: object
+          properties:
+            page: { type: integer }
+            pageSize: { type: integer }
+            total: { type: integer }
+    CreateProductRequest:
+      type: object
+      required: [sellerId, skuId, title, category, price, dimensions, weightKg]
+      properties:
+        sellerId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        title: { type: string }
+        category: { type: string }
+        price: { type: number, format: decimal }
+        dimensions: { $ref: '#/components/schemas/Dimensions' }
+        weightKg: { type: number, format: decimal }
+        isFragile: { type: boolean }
+        isRestricted: { type: boolean }
+    ProductResponse:
+      type: object
+      properties:
+        skuId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        title: { type: string }
+        category: { type: string }
+        price: { type: number, format: decimal }
+        status: { type: string, enum: [Draft, Active, Paused, Blocked, Deleted] }
+        weightKg: { type: number, format: decimal }
+        heightCm: { type: number, format: decimal }
+        widthCm: { type: number, format: decimal }
+        lengthCm: { type: number, format: decimal }
+        isFragile: { type: boolean }
+        isRestricted: { type: boolean }
+        availableForSale: { type: boolean }
+    ProductPhysicalInfoBatchRequest:
+      type: object
+      required: [skuIds]
+      properties:
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+    ProductPhysicalInfoResponse:
+      type: object
+      properties:
+        skuId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        weightKg: { type: number, format: decimal }
+        heightCm: { type: number, format: decimal }
+        widthCm: { type: number, format: decimal }
+        lengthCm: { type: number, format: decimal }
+        category: { type: string }
+        isFragile: { type: boolean }
+        isRestricted: { type: boolean }
+        status: { type: string }
+    UpdateProductPhysicalInfoRequest:
+      type: object
+      required: [weightKg, dimensions]
+      properties:
+        weightKg: { type: number, format: decimal }
+        dimensions: { $ref: '#/components/schemas/Dimensions' }
+        isFragile: { type: boolean }
+        isRestricted: { type: boolean }
+    UpdateProductStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [Draft, Active, Paused, Blocked, Deleted] }
+    CheckoutItemRequest:
+      type: object
+      required: [skuId, quantity]
+      properties:
+        skuId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        unitPrice: { type: number, format: decimal }
+    CreateCheckoutRequest:
+      type: object
+      required: [buyerId, sellerId, shippingAddress, items]
+      properties:
+        buyerId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        shippingAddress: { $ref: '#/components/schemas/Address' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CheckoutItemRequest' }
+    BffCreateCheckoutRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateCheckoutRequest'
+        - type: object
+          properties:
+            paymentMethodId: { type: string }
+    ConfirmCheckoutRequest:
+      type: object
+      required: [paymentIntentId]
+      properties:
+        paymentIntentId: { type: string }
+    BffConfirmCheckoutRequest:
+      type: object
+      properties:
+        paymentToken: { type: string }
+        promiseId: { type: string }
+    ShippingOption:
+      type: object
+      properties:
+        promiseId: { type: string, nullable: true }
+        mode: { type: string, nullable: true }
+        carrier: { type: string, nullable: true }
+        estimatedDeliveryDate: { type: string, format: date, nullable: true }
+        cost: { type: number, format: decimal, nullable: true }
+    CheckoutResponse:
+      type: object
+      properties:
+        checkoutId: { type: string, format: uuid }
+        status: { type: string, enum: [Created, Confirmed, Expired, Cancelled] }
+        itemsTotal: { type: number, format: decimal }
+        shippingCost: { type: number, format: decimal }
+        totalAmount: { type: number, format: decimal }
+        shippingOption: { $ref: '#/components/schemas/ShippingOption' }
+        expiresAt: { type: string, format: date-time }
+    BffCheckoutResponse:
+      type: object
+      properties:
+        checkoutId: { type: string, format: uuid }
+        itemsTotal: { type: number, format: decimal }
+        shippingPrice: { type: number, format: decimal }
+        totalAmount: { type: number, format: decimal }
+        currency: { type: string, example: BRL }
+        selectedShipping: { $ref: '#/components/schemas/ShippingOption' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CheckoutItemRequest' }
+    ShippingPromiseItem:
+      type: object
+      required: [skuId, quantity, unitPrice]
+      properties:
+        skuId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        unitPrice: { type: number, format: decimal }
+    ShippingPromiseRequest:
+      type: object
+      required: [buyerId, sellerId, destination, items]
+      properties:
+        buyerId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        destination: { $ref: '#/components/schemas/Address' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ShippingPromiseItem' }
+    ShippingPromiseResponse:
+      type: object
+      properties:
+        available: { type: boolean }
+        promiseId: { type: string, nullable: true }
+        mode: { type: string, nullable: true, enum: [FULFILLMENT, FLEX, CROSSDOCKING, SELLERSHIPPING, CARRIER, null] }
+        carrier: { type: string, nullable: true }
+        estimatedDeliveryDate: { type: string, format: date, nullable: true }
+        cost: { type: number, format: decimal, nullable: true }
+        source: { type: string, enum: [Calculated, Cache, Fallback] }
+        unavailableReason: { type: string, nullable: true }
+    InventoryAvailabilityBatchRequest:
+      type: object
+      required: [sellerId, skuIds]
+      properties:
+        sellerId: { type: string, format: uuid }
+        skuIds:
+          type: array
+          items: { type: string, format: uuid }
+    InventoryAvailabilityResponse:
+      type: object
+      properties:
+        sellerId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        fulfillmentCenterId: { type: string, format: uuid }
+        onHandQuantity: { type: integer }
+        reservedQuantity: { type: integer }
+        availableQuantity: { type: integer }
+    CreateInventoryReservationRequest:
+      type: object
+      required: [checkoutId, sellerId, items]
+      properties:
+        checkoutId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        items:
+          type: array
+          items:
+            type: object
+            required: [skuId, fulfillmentCenterId, quantity]
+            properties:
+              skuId: { type: string, format: uuid }
+              fulfillmentCenterId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+    InventoryReservationResponse:
+      type: object
+      properties:
+        reservationId: { type: string, format: uuid }
+        checkoutId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        status: { type: string, enum: [Pending, Confirmed, Released, Expired] }
+        expiresAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              skuId: { type: string, format: uuid }
+              fulfillmentCenterId: { type: string, format: uuid }
+              quantity: { type: integer }
+    InventoryAdjustmentRequest:
+      type: object
+      required: [sellerId, skuId, fulfillmentCenterId, quantityDelta, reason]
+      properties:
+        sellerId: { type: string, format: uuid }
+        skuId: { type: string, format: uuid }
+        fulfillmentCenterId: { type: string, format: uuid }
+        quantityDelta: { type: integer }
+        reason: { type: string }
+    FulfillmentCandidatesRequest:
+      type: object
+      required: [sellerId, destinationPostalCode, mode, package]
+      properties:
+        sellerId: { type: string, format: uuid }
+        destinationPostalCode: { type: string }
+        mode: { type: string }
+        package: { $ref: '#/components/schemas/PackageProfile' }
+        requestedAtUtc: { type: string, format: date-time }
+    FulfillmentCandidateResponse:
+      type: object
+      properties:
+        fulfillmentCenterId: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        region: { type: string }
+        mode: { type: string }
+        processingDate: { type: string, format: date }
+        cutoffAt: { type: string, format: date-time }
+        availableCapacityUnits: { type: integer }
+        utilizationPercentage: { type: number }
+        score: { type: number }
+    UpdateFulfillmentCapacityRequest:
+      type: object
+      required: [operationDate, mode, totalCapacityUnits]
+      properties:
+        operationDate: { type: string, format: date }
+        mode: { type: string }
+        totalCapacityUnits: { type: integer, minimum: 0 }
+    UpdateFulfillmentStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    CreateCapacityReservationRequest:
+      type: object
+      required: [orderId, fulfillmentCenterId, operationDate, mode, requiredCapacityUnits]
+      properties:
+        orderId: { type: string, format: uuid }
+        fulfillmentCenterId: { type: string, format: uuid }
+        operationDate: { type: string, format: date }
+        mode: { type: string }
+        requiredCapacityUnits: { type: integer, minimum: 1 }
+    CapacityReservationResponse:
+      type: object
+      properties:
+        reservationId: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        fulfillmentCenterId: { type: string, format: uuid }
+        operationDate: { type: string, format: date }
+        mode: { type: string }
+        reservedCapacityUnits: { type: integer }
+        status: { type: string }
+        expiresAt: { type: string, format: date-time }
+    RouteSearchRequest:
+      type: object
+      required: [originNodeId, destinationPostalCode, package]
+      properties:
+        originNodeId: { type: string, format: uuid }
+        destinationPostalCode: { type: string }
+        package: { $ref: '#/components/schemas/PackageProfile' }
+        requestedAtUtc: { type: string, format: date-time }
+        maxOptions: { type: integer, minimum: 1, maximum: 5 }
+    RouteSearchResponse:
+      type: object
+      properties:
+        networkVersion: { type: integer }
+        source: { type: string }
+        routes:
+          type: array
+          items:
+            type: object
+            properties:
+              routeId: { type: string }
+              originNodeId: { type: string, format: uuid }
+              destinationNodeId: { type: string, format: uuid }
+              estimatedDepartureAt: { type: string, format: date-time }
+              estimatedArrivalAt: { type: string, format: date-time }
+              totalElapsedMinutes: { type: integer }
+              legs:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    laneId: { type: string, format: uuid }
+                    originNodeId: { type: string, format: uuid }
+                    originCode: { type: string }
+                    destinationNodeId: { type: string, format: uuid }
+                    destinationCode: { type: string }
+                    carrierCode: { type: string }
+                    mode: { type: string }
+                    departureAt: { type: string, format: date-time }
+                    arrivalAt: { type: string, format: date-time }
+                    transitMinutes: { type: integer }
+    CreateLogisticsNodeRequest:
+      type: object
+      required: [code, name, region, timeZoneId, type, handlingMinutes]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        region: { type: string }
+        timeZoneId: { type: string }
+        type: { type: string }
+        handlingMinutes: { type: integer }
+    CreateLogisticsLaneRequest:
+      type: object
+      required: [originNodeId, destinationNodeId, carrierCode, mode, transitMinutes, region]
+      properties:
+        originNodeId: { type: string, format: uuid }
+        destinationNodeId: { type: string, format: uuid }
+        carrierCode: { type: string }
+        mode: { type: string }
+        transitMinutes: { type: integer }
+        maximumWeightKg: { type: number }
+        maximumCubicWeightKg: { type: number }
+        supportsFragileItems: { type: boolean }
+        supportsRestrictedItems: { type: boolean }
+        region: { type: string }
+        schedules:
+          type: array
+          items:
+            type: object
+            properties:
+              dayOfWeek: { type: string }
+              departureTime: { type: string }
+              isActive: { type: boolean }
+    UpdateLogisticsLaneRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateLogisticsLaneRequest'
+    CreateCarrierRequest:
+      type: object
+      required: [code, name, requiresRealTimeValidation]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        requiresRealTimeValidation: { type: boolean }
+    CarrierProfileResponse:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        status: { type: string }
+        requiresRealTimeValidation: { type: boolean }
+    UpdateCarrierStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [Active, Degraded, Suspended, Maintenance, Inactive] }
+        reason: { type: string }
+    CarrierStatusWebhookRequest:
+      type: object
+      required: [eventId, status, occurredAt]
+      properties:
+        eventId: { type: string }
+        status: { type: string }
+        reason: { type: string }
+        occurredAt: { type: string, format: date-time }
+        signature: { type: string }
+    CreateCarrierServiceLevelRequest:
+      type: object
+      required: [code, name, mode, maximumWeightKg, maximumCubicWeightKg]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        mode: { type: string }
+        maximumWeightKg: { type: number }
+        maximumCubicWeightKg: { type: number }
+        supportsFragileItems: { type: boolean }
+        supportsRestrictedItems: { type: boolean }
+        priority: { type: integer }
+    CreateCarrierLaneRequest:
+      type: object
+      required: [serviceLevelCode, originNodeId, destinationNodeId, timeZoneId, cutoffTime, operatingDays]
+      properties:
+        serviceLevelCode: { type: string }
+        originNodeId: { type: string, format: uuid }
+        destinationNodeId: { type: string, format: uuid }
+        timeZoneId: { type: string }
+        cutoffTime: { type: string }
+        operatingDays:
+          type: array
+          items: { type: string }
+    CarrierAvailabilitySearchRequest:
+      type: object
+      required: [checks]
+      properties:
+        checks:
+          type: array
+          items:
+            type: object
+            required: [checkId, carrierCode, serviceLevelCode, originNodeId, destinationNodeId, destinationPostalCode, plannedDepartureAtUtc, package]
+            properties:
+              checkId: { type: string }
+              carrierCode: { type: string }
+              serviceLevelCode: { type: string }
+              originNodeId: { type: string, format: uuid }
+              destinationNodeId: { type: string, format: uuid }
+              destinationPostalCode: { type: string }
+              plannedDepartureAtUtc: { type: string, format: date-time }
+              package: { $ref: '#/components/schemas/PackageProfile' }
+    CarrierAvailabilitySearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              checkId: { type: string }
+              carrierCode: { type: string }
+              serviceLevelCode: { type: string }
+              available: { type: boolean }
+              reasonCode: { type: string }
+              source: { type: string, enum: [Local, External] }
+              evaluatedAt: { type: string, format: date-time }
+              validUntil: { type: string, format: date-time }
+    BatchShippingPriceRequest:
+      type: object
+      required: [buyerId, sellerId, destinationPostalCode, cartTotal, currency, candidates]
+      properties:
+        buyerId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        destinationPostalCode: { type: string }
+        cartTotal: { type: number, format: decimal }
+        currency: { type: string, example: BRL }
+        requestedAtUtc: { type: string, format: date-time }
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [candidateId, routeId, originNodeId, carrierCode, serviceLevelCode, package]
+            properties:
+              candidateId: { type: string }
+              routeId: { type: string }
+              originNodeId: { type: string, format: uuid }
+              carrierCode: { type: string }
+              serviceLevelCode: { type: string }
+              package: { $ref: '#/components/schemas/PackageProfile' }
+    ShippingPriceQuoteResponse:
+      type: object
+      properties:
+        candidateId: { type: string }
+        available: { type: boolean }
+        quoteId: { type: string, format: uuid, nullable: true }
+        routeId: { type: string }
+        currency: { type: string }
+        chargeableWeightKg: { type: number, nullable: true }
+        logisticsCost: { type: number, nullable: true }
+        customerPrice: { type: number, nullable: true }
+        platformSubsidy: { type: number, nullable: true }
+        sellerSubsidy: { type: number, nullable: true }
+        discount: { type: number, nullable: true }
+        adjustments:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              description: { type: string }
+              type: { type: string }
+              amount: { type: number }
+        rateCardVersion: { type: integer, nullable: true }
+        source: { type: string }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        unavailableReason: { type: string, nullable: true }
+    BatchShippingPriceResponse:
+      type: object
+      properties:
+        quotes:
+          type: array
+          items: { $ref: '#/components/schemas/ShippingPriceQuoteResponse' }
+    RateCardRequest:
+      type: object
+      additionalProperties: true
+    RateCardResponse:
+      type: object
+      additionalProperties: true
+    OrderResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        checkoutId: { type: string, format: uuid }
+        buyerId: { type: string, format: uuid }
+        sellerId: { type: string, format: uuid }
+        status: { type: string }
+        currency: { type: string }
+        itemsTotal: { type: number }
+        shippingPrice: { type: number }
+        totalAmount: { type: number }
+        shippingPromiseId: { type: string }
+        pricingQuoteId: { type: string, format: uuid }
+        inventoryReservationId: { type: string, format: uuid }
+        capacityReservationId: { type: string, format: uuid }
+        paymentAuthorizationId: { type: string, format: uuid }
+        shipmentId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              skuId: { type: string, format: uuid }
+              title: { type: string }
+              quantity: { type: integer }
+              unitPrice: { type: number }
+              totalPrice: { type: number }
+    CancelOrderRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string }
+    ShipmentResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        status: { type: string }
+        carrierCode: { type: string }
+        serviceLevelCode: { type: string }
+        trackingCode: { type: string }
+        promisedDeliveryDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+        readyAt: { type: string, format: date-time, nullable: true }
+        packages:
+          type: array
+          items:
+            type: object
+            properties:
+              sequence: { type: integer }
+              weightKg: { type: number }
+              heightCm: { type: number }
+              widthCm: { type: number }
+              lengthCm: { type: number }
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    skuId: { type: string, format: uuid }
+                    quantity: { type: integer }
+    ShipmentLabelResponse:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        expiresInSeconds: { type: integer }
+    TrackingLocation:
+      type: object
+      properties:
+        facilityCode: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+    TrackingResponse:
+      type: object
+      properties:
+        shipmentId: { type: string, format: uuid }
+        trackingCode: { type: string }
+        carrierCode: { type: string }
+        currentStatus: { type: string }
+        lastLocation: { $ref: '#/components/schemas/TrackingLocation' }
+        lastEventOccurredAt: { type: string, format: date-time }
+        estimatedDeliveryDate: { type: string, format: date, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        currentExceptionCode: { type: string, nullable: true }
+    TrackingEventResponse:
+      type: object
+      properties:
+        eventId: { type: string, format: uuid }
+        status: { type: string }
+        description: { type: string }
+        exceptionCode: { type: string, nullable: true }
+        location: { $ref: '#/components/schemas/TrackingLocation' }
+        occurredAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+    TrackingStatusChangedEvent:
+      type: object
+      required: [messageId, shipmentId, buyerId, trackingCode, currentStatus, occurredAt]
+      properties:
+        messageId: { type: string, format: uuid }
+        shipmentId: { type: string, format: uuid }
+        buyerId: { type: string, format: uuid }
+        trackingCode: { type: string }
+        currentStatus: { type: string }
+        occurredAt: { type: string, format: date-time }
+        estimatedDeliveryDate: { type: string, format: date, nullable: true }
+        exceptionCode: { type: string, nullable: true }
+    NotificationResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        recipientId: { type: string, format: uuid }
+        type: { type: string }
+        status: { type: string }
+        priority: { type: integer }
+        createdAt: { type: string, format: date-time }
+        deliveries:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              channel: { type: string }
+              status: { type: string }
+              templateVersion: { type: integer }
+              attempts: { type: integer }
+              acceptedAt: { type: string, format: date-time, nullable: true }
+              deliveredAt: { type: string, format: date-time, nullable: true }
+              destination: { type: string }
+    ProviderReceiptRequest:
+      type: object
+      required: [providerEventId, providerMessageId, status, occurredAt]
+      properties:
+        providerEventId: { type: string }
+        providerMessageId: { type: string }
+        status: { type: string, enum: [Delivered, Bounced, Failed] }
+        occurredAt: { type: string, format: date-time }
+        signature: { type: string }
+    ProductPageResponse:
+      type: object
+      properties:
+        product: { $ref: '#/components/schemas/ProductResponse' }
+        shipping: { $ref: '#/components/schemas/ShippingPromiseResponse' }
+        warnings:
+          type: array
+          items: { type: string }
+    OrderPageResponse:
+      type: object
+      properties:
+        order: { $ref: '#/components/schemas/OrderResponse' }
+        shipment: { $ref: '#/components/schemas/ShipmentResponse' }
+        tracking: { $ref: '#/components/schemas/TrackingResponse' }
+        warnings:
+          type: array
+          items: { type: string }
