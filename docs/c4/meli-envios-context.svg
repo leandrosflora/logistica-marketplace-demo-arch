@@ -1,0 +1,63 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1400' height='900' viewBox='0 0 1400 900'>
+  <defs>
+    <marker id='arrow' markerWidth='10' markerHeight='10' refX='9' refY='3' orient='auto' markerUnits='strokeWidth'>
+      <path d='M0,0 L0,6 L9,3 z' fill='#374151'/>
+    </marker>
+    <style>
+      .title{font:bold 30px Arial;fill:#111827}.sub{font:15px Arial;fill:#4b5563}.box{fill:#eef4ff;stroke:#2563eb;stroke-width:2;rx:14}.ext{fill:#f9fafb;stroke:#6b7280;stroke-width:2;rx:14}.person{fill:#eff6ff;stroke:#2563eb;stroke-width:2}.label{font:bold 17px Arial;fill:#111827}.body{font:13px Arial;fill:#374151}.line{stroke:#374151;stroke-width:2.2;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width='1400' height='900' fill='white'/>
+  <text x='700' y='55' text-anchor='middle' class='title'>Meli Envios - C4 Nível 1 - Contexto</text>
+  <text x='700' y='84' text-anchor='middle' class='sub'>Ecossistema de compra, promessa de entrega, transportadoras, pagamento e notificações</text>
+
+  <g transform='translate(80,185)'>
+    <circle cx='60' cy='35' r='24' class='person'/>
+    <rect x='25' y='65' width='70' height='80' rx='20' class='person'/>
+    <text x='60' y='178' text-anchor='middle' class='label'>Comprador</text>
+    <text x='60' y='200' text-anchor='middle' class='body'>Pesquisa e compra</text>
+  </g>
+
+  <g transform='translate(80,555)'>
+    <circle cx='60' cy='35' r='24' class='person'/>
+    <rect x='25' y='65' width='70' height='80' rx='20' class='person'/>
+    <text x='60' y='178' text-anchor='middle' class='label'>Seller</text>
+    <text x='60' y='200' text-anchor='middle' class='body'>Publica ofertas</text>
+  </g>
+
+  <rect x='300' y='315' width='260' height='135' class='box'/>
+  <text x='430' y='355' text-anchor='middle' class='label'>Marketplace</text>
+  <text x='430' y='382' text-anchor='middle' class='body'>Canal web/app</text>
+  <text x='430' y='404' text-anchor='middle' class='body'>experiência de compra</text>
+
+  <rect x='650' y='260' width='300' height='245' class='box'/>
+  <text x='800' y='305' text-anchor='middle' class='label'>Meli Envios Platform</text>
+  <text x='800' y='335' text-anchor='middle' class='body'>Promessa de entrega</text>
+  <text x='800' y='357' text-anchor='middle' class='body'>preço, rota, shipment</text>
+  <text x='800' y='379' text-anchor='middle' class='body'>tracking e auditoria</text>
+
+  <rect x='1070' y='150' width='255' height='105' class='ext'/>
+  <text x='1198' y='190' text-anchor='middle' class='label'>Transportadoras</text>
+  <text x='1198' y='216' text-anchor='middle' class='body'>Correios e parceiros</text>
+
+  <rect x='1070' y='345' width='255' height='105' class='ext'/>
+  <text x='1198' y='385' text-anchor='middle' class='label'>Payment Platform</text>
+  <text x='1198' y='411' text-anchor='middle' class='body'>Confirma pagamento</text>
+
+  <rect x='1070' y='540' width='255' height='105' class='ext'/>
+  <text x='1198' y='580' text-anchor='middle' class='label'>Notification Providers</text>
+  <text x='1198' y='606' text-anchor='middle' class='body'>Push, e-mail, WhatsApp/SMS</text>
+
+  <line x1='205' y1='300' x2='300' y2='355' class='line'/>
+  <text x='230' y='315' class='body'>Pesquisa produtos</text>
+  <line x1='205' y1='670' x2='300' y2='425' class='line'/>
+  <text x='225' y='555' class='body'>Publica ofertas</text>
+  <line x1='560' y1='382' x2='650' y2='382' class='line'/>
+  <text x='575' y='365' class='body'>Consulta frete, prazo e cria entrega</text>
+  <line x1='950' y1='300' x2='1070' y2='205' class='line'/>
+  <text x='960' y='245' class='body'>Cota e rastreia</text>
+  <line x1='560' y1='410' x2='1070' y2='397' class='line'/>
+  <text x='775' y='430' class='body'>Confirma pagamento</text>
+  <line x1='950' y1='470' x2='1070' y2='590' class='line'/>
+  <text x='955' y='535' class='body'>Solicita notificações</text>
+</svg>
