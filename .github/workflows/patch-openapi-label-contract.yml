@@ -2,11 +2,6 @@ name: Patch OpenAPI label contract
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/patch-openapi-label-contract.yml'
 
 permissions:
   contents: write
@@ -27,29 +22,34 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('docs/contracts/meli-envios-apis.openapi.yaml')
-          text = path.read_text(encoding='utf-8')
+          path = Path("docs/contracts/meli-envios-apis.openapi.yaml")
+          text = path.read_text(encoding="utf-8")
 
-          old = """        '200':
-          description: Arquivo PDF da etiqueta
-          content:
-            application/pdf:
-              schema: { type: string, format: binary }
-"""
+          old = "\n".join([
+              "        '200':",
+              "          description: Arquivo PDF da etiqueta",
+              "          content:",
+              "            application/pdf:",
+              "              schema: { type: string, format: binary }",
+              ""
+          ])
 
-          new = """        '200':
-          description: URL temporária da etiqueta
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
-"""
+          new = "\n".join([
+              "        '200':",
+              "          description: URL temporária da etiqueta",
+              "          content:",
+              "            application/json:",
+              "              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }",
+              ""
+          ])
 
-          if old not in text:
-              print('Target block not found. File may already be patched.')
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+              print("OpenAPI label response patched.")
+          elif new in text:
+              print("OpenAPI label response already patched.")
           else:
-              text = text.replace(old, new, 1)
-              path.write_text(text, encoding='utf-8')
-              print('OpenAPI label response patched.')
+              raise SystemExit("Target OpenAPI block not found.")
           PY
 
       - name: Show changes
@@ -68,4 +68,4 @@ jobs:
 
           git add docs/contracts/meli-envios-apis.openapi.yaml
           git commit -m "fix: update BFF shipment label OpenAPI contract"
-          git push
+          git push origin "HEAD:${GITHUB_REF_NAME}"
