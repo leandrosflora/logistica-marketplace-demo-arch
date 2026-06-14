@@ -3,7 +3,6 @@
 ## OpenAPI
 
 - [`meli-envios-apis.openapi.yaml`](meli-envios-apis.openapi.yaml): contrato OpenAPI consolidado dos serviços envolvidos no case.
-- [`shipping-promise-api.yaml`](shipping-promise-api.yaml): contrato anterior específico do Shipping Promise, mantido por compatibilidade histórica.
 
 ## Validação
 
