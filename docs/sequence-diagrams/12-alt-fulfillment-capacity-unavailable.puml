@@ -1,0 +1,43 @@
+@startuml
+title 12 - Fluxo Alternativo - Capacidade de Fulfillment Indisponível
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Shipping Promise Service" as Promise
+participant "Fulfillment Center Service" as FC
+participant "Inventory Service" as Inventory
+participant "Routing Service" as Routing
+queue "Kafka" as Kafka
+participant "Order Service" as Order
+
+Comprador -> FE: Solicita cotação com CEP
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?zipCode={cep}
+BFF -> Promise: POST /shipping-promises/
+Promise -> Inventory: POST /inventory/availability/batch
+Inventory --> Promise: Estoque disponível
+Promise -> FC: POST /fulfillment-centers/candidates/search
+
+alt Nenhum centro com capacidade
+  FC --> Promise: []
+  Promise --> BFF: available=false, unavailableReason="No fulfillment capacity available"
+  BFF --> FE: Shipping indisponível
+  FE --> Comprador: Exibe produto sem entrega disponível
+else Centro retornado, mas sem janela viável
+  FC --> Promise: Candidatos sem janela/cutoff válido
+  Promise --> BFF: available=false, unavailableReason="No operational window available"
+end
+
+== Falha em reserva de capacidade após pedido ==
+Kafka -> Order: CheckoutConfirmedIntegrationEvent
+Order -> Kafka: ReserveFulfillmentCapacityCommand
+Kafka -> FC: ReserveFulfillmentCapacityCommand
+FC -> FC: Capacidade esgotada no slot
+FC -> Kafka: FulfillmentCapacityReservationFailedIntegrationEvent
+Kafka -> Order: Falha de reserva de capacidade
+Order -> Order: Cancela pedido em saga
+Order -> Kafka: ReleaseInventoryReservationCommand
+Order -> Kafka: OrderCancelledIntegrationEvent
+
+@enduml
