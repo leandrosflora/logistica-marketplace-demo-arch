@@ -190,10 +190,10 @@ paths:
         - $ref: '#/components/parameters/ShipmentId'
       responses:
         '200':
-          description: Arquivo PDF da etiqueta
+          description: URL temporária da etiqueta
           content:
-            application/pdf:
-              schema: { type: string, format: binary }
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
         '404': { description: Etiqueta não encontrada }
   /v1/products/search:
     get:
