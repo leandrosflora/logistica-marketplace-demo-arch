@@ -1,0 +1,36 @@
+@startuml
+title 04 - Tracking e Notificação - Fluxo Feliz
+
+autonumber
+participant "Carrier/Provider" as Provider
+queue "Kafka" as Kafka
+participant "Tracking Service" as Tracking
+database "Tracking DB" as TrackingDb
+participant "Notification Service" as Notification
+database "Notification DB" as NotificationDb
+actor Buyer as Comprador
+
+Provider -> Kafka: CarrierTrackingEventIntegrationEvent
+Kafka -> Tracking: Consome evento de tracking
+activate Tracking
+Tracking -> TrackingDb: Verifica inbox por messageId
+Tracking -> TrackingDb: Verifica duplicidade providerEventId
+Tracking -> TrackingDb: Persiste TrackingEvent
+Tracking -> TrackingDb: Atualiza ShipmentTracking
+Tracking -> Kafka: TrackingStatusChangedIntegrationEvent
+deactivate Tracking
+
+Kafka -> Notification: Consome TrackingStatusChangedIntegrationEvent
+activate Notification
+Notification -> NotificationDb: Verifica inbox por messageId
+Notification -> NotificationDb: Carrega preferências do destinatário
+Notification -> NotificationDb: Cria Notification + Delivery
+Notification -> Provider: Envia mensagem no canal configurado
+Provider --> Notification: Accepted
+Notification -> NotificationDb: Marca delivery como Accepted
+Notification -> Kafka: NotificationAcceptedIntegrationEvent
+deactivate Notification
+
+Notification --> Comprador: Recebe atualização de entrega
+
+@enduml
