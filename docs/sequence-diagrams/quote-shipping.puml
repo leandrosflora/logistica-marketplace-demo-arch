@@ -1,0 +1,36 @@
+@startuml
+title Cotação de frete e promessa de entrega
+
+actor Buyer
+participant "Frontend" as FE
+participant "Marketplace BFF" as BFF
+participant "Checkout Service" as Checkout
+participant "Shipping Promise Service" as Promise
+participant "Product Catalog Service" as Catalog
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Routing Service" as Routing
+participant "Carrier Service" as Carrier
+participant "Shipping Pricing Service" as Pricing
+queue "Kafka" as Kafka
+
+Buyer -> FE: Pesquisa produto e informa CEP
+FE -> BFF: POST /shipping/quote
+BFF -> Checkout: POST /v1/checkouts/{id}/shipping-quote
+Checkout -> Promise: POST /v1/shipping-promises/quote
+
+Promise -> Catalog: GET /v1/products/{sku}/logistics
+Promise -> Inventory: GET /v1/inventory?sku&sellerId
+Promise -> FC: GET /v1/fulfillment-centers/availability
+Promise -> Routing: POST /v1/routes/calculate
+Promise -> Carrier: POST /v1/carriers/options
+Promise -> Pricing: POST /v1/shipping-prices/calculate
+
+Promise --> Checkout: promises[]
+Checkout -> Kafka: checkout.shipping.quote.requested
+Checkout <-- Promise: shipping promise
+Checkout --> BFF: quote result
+BFF --> FE: prazo, preço e modalidade
+FE --> Buyer: Exibe opções de entrega
+
+@enduml
