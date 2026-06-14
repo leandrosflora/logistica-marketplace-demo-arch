@@ -1,0 +1,44 @@
+@startuml
+title 17 - Fluxo Alternativo - Cancelamento Antes do Shipment
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Order Service" as Order
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Payment Platform" as Payment
+participant "Notification Service" as Notification
+queue "Kafka" as Kafka
+database "Order DB" as OrderDb
+
+Comprador -> FE: Solicita cancelamento
+FE -> BFF: POST /api/web/v1/orders/{orderId}/cancel + Idempotency-Key
+BFF -> Order: POST /orders/{orderId}/cancel + Idempotency-Key
+activate Order
+Order -> OrderDb: Verifica pedido e chave idempotente
+alt Pedido ainda não possui shipment
+  Order -> OrderDb: Marca pedido como Cancelled
+  Order -> Kafka: ReleaseInventoryReservationCommand
+  Order -> Kafka: ReleaseFulfillmentCapacityCommand
+  Order -> Kafka: VoidPaymentAuthorizationCommand
+  Order -> Kafka: OrderCancelledIntegrationEvent
+  Order --> BFF: 202 Accepted
+else Pedido já confirmado ou shipment criado
+  Order --> BFF: 409 Conflict
+end
+deactivate Order
+
+BFF --> FE: Resultado do cancelamento
+FE --> Comprador: Exibe status atualizado
+
+Kafka -> Inventory: ReleaseInventoryReservationCommand
+Inventory -> Kafka: InventoryReservationReleasedIntegrationEvent
+Kafka -> FC: ReleaseFulfillmentCapacityCommand
+FC -> Kafka: FulfillmentCapacityReleasedIntegrationEvent
+Kafka -> Payment: VoidPaymentAuthorizationCommand
+Kafka -> Notification: OrderCancelledIntegrationEvent
+Notification -> Notification: Notifica cancelamento
+
+@enduml
