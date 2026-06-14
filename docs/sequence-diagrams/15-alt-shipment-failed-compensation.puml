@@ -1,0 +1,54 @@
+@startuml
+title 15 - Fluxo Alternativo - Falha na Criação do Shipment e Compensações
+
+autonumber
+queue "Kafka" as Kafka
+participant "Order Service" as Order
+participant "Shipment Service" as Shipment
+participant "Carrier Service" as Carrier
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Payment Platform" as Payment
+participant "Notification Service" as Notification
+
+database "Order DB" as OrderDb
+
+Kafka -> Order: Reservas e autorização concluídas
+activate Order
+Order -> Kafka: CreateShipmentCommand
+deactivate Order
+
+Kafka -> Shipment: CreateShipmentCommand
+activate Shipment
+Shipment -> Shipment: Aplica inbox/idempotência
+Shipment -> Shipment: Cria shipment PendingCarrierBooking
+Shipment -> Carrier: Booking de shipment
+
+alt Erro permanente no Carrier
+  Carrier --> Shipment: 422 / regra logística rejeitada
+  Shipment -> Shipment: Marca shipment Failed
+  Shipment -> Kafka: ShipmentCreationFailedIntegrationEvent
+else Tentativas esgotadas
+  Carrier --> Shipment: Erros transitórios repetidos
+  Shipment -> Shipment: Agenda retries com backoff
+  Shipment -> Shipment: Excede limite de tentativas
+  Shipment -> Kafka: ShipmentCreationFailedIntegrationEvent
+end
+deactivate Shipment
+
+Kafka -> Order: ShipmentCreationFailedIntegrationEvent
+activate Order
+Order -> OrderDb: Cancela pedido antes da etapa final
+Order -> Kafka: ReleaseInventoryReservationCommand
+Order -> Kafka: ReleaseFulfillmentCapacityCommand
+Order -> Kafka: VoidPaymentAuthorizationCommand
+Order -> Kafka: OrderCancelledIntegrationEvent
+deactivate Order
+
+Kafka -> Inventory: ReleaseInventoryReservationCommand
+Kafka -> FC: ReleaseFulfillmentCapacityCommand
+Kafka -> Payment: VoidPaymentAuthorizationCommand
+Kafka -> Notification: OrderCancelledIntegrationEvent
+Notification -> Notification: Notifica cancelamento por falha logística
+
+@enduml
