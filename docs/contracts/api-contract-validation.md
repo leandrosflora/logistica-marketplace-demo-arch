@@ -4,7 +4,7 @@ Data da revalidação: 2026-06-14
 
 ## Objetivo
 
-Revalidar os contratos HTTP dos repositórios envolvidos no case Meli Envios após os ajustes feitos nos microservices e no BFF.
+Revalidar os contratos HTTP dos repositórios envolvidos no case Meli Envios após a correção das 8 pendências apontadas na validação anterior.
 
 Arquivo OpenAPI consolidado de referência:
 
@@ -19,326 +19,139 @@ A validação priorizou o código atual dos endpoints e clients HTTP dos reposit
 - `Contracts/*.cs`
 - `Program.cs`, quando necessário para confirmar o mapeamento de endpoints
 
-Quando o código não era suficiente para inferir intenção de negócio, foi usada a documentação do próprio repositório como apoio.
-
 ## Resultado executivo
 
-As **rotas antigas** do `ShippingPromiseService` foram majoritariamente corrigidas para as rotas reais dos serviços donos das APIs:
+As 8 pendências críticas apontadas na validação anterior foram corrigidas.
 
-| Integração | Status rota | Observação |
-|---|---:|---|
-| ShippingPromise -> ProductCatalog | OK | Usa `POST /products/physical-info/batch`. |
-| ShippingPromise -> Inventory | OK | Usa `POST /inventory/availability/batch`. |
-| ShippingPromise -> FulfillmentCenter | OK | Usa `POST /fulfillment-centers/candidates/search`. |
-| ShippingPromise -> Routing | OK | Usa `POST /routes/search`. |
-| ShippingPromise -> Carrier | OK | Usa `POST /carrier-availability/search`. |
-| ShippingPromise -> ShippingPricing | OK | Usa `POST /shipping-prices/quotes/batch`. |
-
-Entretanto, ainda existem **incompatibilidades de request/response** que podem quebrar a jornada em runtime.
+| Item | Validação | Status |
+|---|---|---:|
+| 1 | `ShippingPromiseService -> FulfillmentCenterService` mapeia o response real do Fulfillment. | OK |
+| 2 | `ShippingPromiseService -> RoutingService` lê `SearchRoutesResponse.routes[]` e mapeia para `RouteOption`. | OK |
+| 3 | `ShippingPromiseService -> CarrierService` envia `checkId` em cada item de `checks`. | OK |
+| 4 | `ShippingPromiseService -> ShippingPricingService` envia `buyerId`, `sellerId`, `destinationPostalCode`, `cartTotal`, `currency` e `candidates[]`. | OK |
+| 5 | `MarketplaceWeb.Bff -> TrackingService` chama `GET /tracking/shipments/{shipmentId}`. | OK |
+| 6 | `MarketplaceWeb.Bff -> OrderService` não chama mais `GET /orders`. | OK |
+| 7 | `MarketplaceWeb.Bff -> OrderService` envia body de cancelamento e trata `202 Accepted` sem body. | OK |
+| 8 | `MarketplaceWeb.Bff -> ShipmentService` trata label como JSON com `url` e `expiresInSeconds`. | OK |
 
 ## Status por componente
 
 | Componente | Status | Resultado |
 |---|---:|---|
 | MarketplaceWeb | N/A | Frontend web; não expõe API downstream. |
-| MarketplaceWeb.Bff | Atenção | Endpoints existem, mas há inconsistências com Order, Tracking e Shipment. |
+| MarketplaceWeb.Bff | OK | Endpoints e clients downstream revalidados. |
 | ProductSearchService | OK | `GET /v1/products/search` compatível com BFF. |
 | ProductCatalogService | OK | `GET /products/{skuId}` e `POST /products/physical-info/batch` compatíveis. |
 | CheckoutService | OK | `POST /checkouts`, `GET /checkouts/{checkoutId}` e `POST /checkouts/{checkoutId}/confirm` compatíveis com BFF. |
-| ShippingPromiseService | Atenção | Endpoint público OK, mas clients downstream ainda possuem incompatibilidades de payload/response. |
+| ShippingPromiseService | OK | Endpoint público e clients downstream revalidados. |
 | InventoryService | OK | Endpoint e response compatíveis com `ShippingPromiseService`. |
-| FulfillmentCenterService | Atenção | Rota correta, response incompatível com DTO esperado pelo `ShippingPromiseService`. |
-| RoutingService | Atenção | Rota/request próximos, response incompatível com DTO esperado pelo `ShippingPromiseService`. |
-| CarrierService | Atenção | Rota correta, mas request do `ShippingPromiseService` não envia `checkId`, que é obrigatório. |
-| ShippingPricingService | Atenção | Rota correta, mas request e response esperados pelo `ShippingPromiseService` ainda não batem. |
-| OrderService | Atenção | API pública existe, mas não possui `GET /orders` usado pelo BFF; cancelamento também diverge. |
-| ShipmentService | Atenção | API pública existe, mas label retorna JSON com URL; BFF espera PDF binário. |
-| TrackingService | Atenção | API pública existe, mas BFF chama rota diferente da rota real. |
+| FulfillmentCenterService | OK | Rota, request e response agora compatíveis via adapter do `ShippingPromiseService`. |
+| RoutingService | OK | Rota e response agora compatíveis via adapter do `ShippingPromiseService`. |
+| CarrierService | OK | Request agora inclui `checkId` obrigatório. |
+| ShippingPricingService | OK | Request e response agora compatíveis via adapter do `ShippingPromiseService`. |
+| OrderService | OK | Consulta por ID e cancelamento compatíveis com BFF. |
+| ShipmentService | OK | Label JSON compatível com BFF. |
+| TrackingService | OK | Rota de consulta por shipment compatível com BFF. |
 | NotificationService | OK | Endpoints HTTP batem com a documentação atual. |
 
-## Validações OK
-
-### ProductSearchService
-
-Endpoint validado:
-
-```http
-GET /v1/products/search?query={texto}&page={page}&pageSize={pageSize}&zipCode={zipCode}&region={region}
-```
-
-Status: **OK**.
-
-Observação: o BFF aceita `query` ou `q`, mas sempre chama o downstream usando `query`.
-
----
-
-### ProductCatalogService
-
-Endpoints validados:
-
-```http
-POST /products/
-GET /products/{skuId}
-POST /products/physical-info/batch
-PUT /products/{skuId}/physical-info
-PATCH /products/{skuId}/status
-```
-
-Status: **OK**.
-
----
-
-### CheckoutService
-
-Endpoints validados:
-
-```http
-POST /checkouts
-GET /checkouts/{checkoutId}
-POST /checkouts/{checkoutId}/confirm
-```
-
-Status: **OK**.
-
-Observação: BFF propaga `Idempotency-Key` para criação e confirmação.
-
----
-
-### InventoryService
-
-Endpoint usado pelo `ShippingPromiseService`:
-
-```http
-POST /inventory/availability/batch
-```
-
-Status: **OK**.
-
-Request enviado pelo client:
-
-```json
-{
-  "sellerId": "guid",
-  "skuIds": ["guid"]
-}
-```
-
-Contrato esperado pelo `InventoryService`:
-
-```json
-{
-  "sellerId": "guid",
-  "skuIds": ["guid"]
-}
-```
-
-Response do serviço contém `skuId`, `fulfillmentCenterId` e `availableQuantity`, que são os campos necessários ao `ShippingPromiseService`.
-
----
-
-## Divergências atuais
+## Revalidação das pendências anteriores
 
 ### 1. ShippingPromiseService -> FulfillmentCenterService
 
-**Rota:** OK.
+**Status:** OK.
+
+O client continua chamando:
 
 ```http
 POST /fulfillment-centers/candidates/search
 ```
 
-**Request:** compatível.
+E agora desserializa o response real do `FulfillmentCenterService` em um DTO downstream específico:
 
-O client envia:
-
-```json
-{
-  "sellerId": "guid",
-  "destinationPostalCode": "01310-100",
-  "mode": "Fulfillment",
-  "package": {
-    "weightKg": 1.2,
-    "cubicWeightKg": 1.0,
-    "isFragile": false,
-    "isRestricted": false
-  },
-  "requestedAtUtc": "2026-06-14T00:00:00Z"
-}
+```csharp
+FulfillmentCenterCandidateResponse(
+  Guid FulfillmentCenterId,
+  string Region,
+  DateTimeOffset CutoffAt,
+  int AvailableCapacityUnits,
+  int Score)
 ```
 
-O serviço espera esse formato.
-
-**Response:** incompatível.
-
-`FulfillmentCenterService` retorna:
-
-```json
-{
-  "fulfillmentCenterId": "guid",
-  "code": "FC-SP01",
-  "name": "Fulfillment Center São Paulo 01",
-  "region": "SP",
-  "mode": "Fulfillment",
-  "processingDate": "2026-06-10",
-  "cutoffAt": "2026-06-10T18:00:00-03:00",
-  "availableCapacityUnits": 120,
-  "utilizationPercentage": 37.5,
-  "score": 137
-}
-```
-
-`ShippingPromiseService` tenta desserializar para:
+Depois mapeia para o modelo interno:
 
 ```csharp
 FulfillmentCandidate(
-  Guid FulfillmentCenterId,
-  string Region,
-  TimeOnly CutoffTime,
-  bool HasCapacity,
-  int CapacityScore)
+  FulfillmentCenterId,
+  Region,
+  TimeOnly.FromTimeSpan(CutoffAt.TimeOfDay),
+  AvailableCapacityUnits > 0,
+  Score)
 ```
 
-**Impacto provável:** `HasCapacity` tende a ficar `false` por ausência do campo no JSON, então o `ShippingPromiseService` pode descartar todos os fulfillment centers.
-
-**Correção recomendada:** criar DTO downstream específico no `ShippingPromiseService` e mapear:
-
-| FulfillmentCenterService | ShippingPromiseService |
-|---|---|
-| `fulfillmentCenterId` | `FulfillmentCenterId` |
-| `region` | `Region` |
-| `cutoffAt.TimeOfDay` | `CutoffTime` |
-| `availableCapacityUnits > 0` | `HasCapacity` |
-| `score` | `CapacityScore` |
+Resultado: a incompatibilidade entre `cutoffAt`/`availableCapacityUnits`/`score` e `cutoffTime`/`hasCapacity`/`capacityScore` foi resolvida.
 
 ---
 
 ### 2. ShippingPromiseService -> RoutingService
 
-**Rota:** OK.
+**Status:** OK.
+
+O client continua chamando:
 
 ```http
 POST /routes/search
 ```
 
-**Request:** compatível em termos gerais.
-
-O client envia `originNodeId`, `destinationPostalCode`, `package`, `requestedAtUtc` e `maxOptions`.
-
-**Response:** incompatível.
-
-`RoutingService` retorna um objeto:
-
-```json
-{
-  "networkVersion": 2,
-  "source": "Calculated",
-  "routes": [
-    {
-      "routeId": "route_x",
-      "originNodeId": "guid",
-      "destinationNodeId": "guid",
-      "estimatedDepartureAt": "date-time",
-      "estimatedArrivalAt": "date-time",
-      "totalElapsedMinutes": 390,
-      "legs": []
-    }
-  ]
-}
-```
-
-`ShippingPromiseService` tenta desserializar diretamente para:
+E agora desserializa o objeto correto:
 
 ```csharp
-List<RouteOption>
+SearchRoutesResponse(IReadOnlyList<RouteResponse>? Routes)
 ```
 
-com campos:
+Depois mapeia cada rota para `RouteOption`, usando:
 
-```csharp
-RouteId,
-OriginNodeId,
-DestinationNodeId,
-CarrierCode,
-ServiceLevelCode,
-TransitDays,
-Available,
-Priority
-```
+- `route.routeId`
+- `route.originNodeId`
+- `route.destinationNodeId`
+- `route.totalElapsedMinutes`
+- `route.legs[0].carrierCode`
+- `route.legs[0].serviceLevelCode` ou `route.legs[0].mode`
 
-**Impacto provável:** desserialização incorreta ou lista vazia; o cálculo de promessa não consegue gerar candidatos.
-
-**Correção recomendada:** desserializar `SearchRoutesResponse`, iterar `Routes` e mapear cada rota/leg para `RouteOption`. Exemplo de regra:
-
-- `RouteId` <- `route.routeId`
-- `OriginNodeId` <- `route.originNodeId`
-- `DestinationNodeId` <- `route.destinationNodeId`
-- `CarrierCode` <- `route.legs[0].carrierCode`
-- `ServiceLevelCode` <- definir contrato no Routing ou inferir do carrier/mode
-- `TransitDays` <- `ceil(totalElapsedMinutes / 1440)` ou campo explícito no Routing
-- `Available` <- `true` quando rota existir
-- `Priority` <- índice da rota ou score futuro
+Resultado: a incompatibilidade anterior, em que o client tentava ler diretamente `List<RouteOption>`, foi resolvida.
 
 ---
 
 ### 3. ShippingPromiseService -> CarrierService
 
-**Rota:** OK.
+**Status:** OK.
+
+O client continua chamando:
 
 ```http
 POST /carrier-availability/search
 ```
 
-**Request:** incompatível.
+E agora envia `checkId` em cada item de `checks`:
 
-`CarrierService` exige `checkId` em cada item de `checks`.
-
-Contrato real:
-
-```json
-{
-  "checks": [
-    {
-      "checkId": "check-001",
-      "carrierCode": "MELI-LOGISTICS",
-      "serviceLevelCode": "EXPRESS",
-      "originNodeId": "guid",
-      "destinationNodeId": "guid",
-      "destinationPostalCode": "01001-000",
-      "plannedDepartureAtUtc": "2026-06-10T20:30:00Z",
-      "package": {
-        "weightKg": 10.5,
-        "cubicWeightKg": 12.0,
-        "isFragile": false,
-        "isRestricted": false,
-        "category": "electronics"
-      }
-    }
-  ]
-}
+```csharp
+checkId = $"{route.RouteId}:{route.CarrierCode}:{route.ServiceLevelCode}"
 ```
 
-`ShippingPromiseService` envia todos os campos acima, exceto `checkId`.
-
-**Impacto provável:** `CarrierService` retorna erro de validação: `CheckId is required`.
-
-**Correção recomendada:** gerar `checkId` determinístico por candidato, por exemplo:
-
-```text
-{routeId}:{carrierCode}:{serviceLevelCode}
-```
+Resultado: o request agora atende ao contrato obrigatório do `CarrierService`.
 
 ---
 
 ### 4. ShippingPromiseService -> ShippingPricingService
 
-**Rota:** OK.
+**Status:** OK.
+
+O client continua chamando:
 
 ```http
 POST /shipping-prices/quotes/batch
 ```
 
-**Request:** incompatível.
-
-`ShippingPricingService` espera:
+E agora envia o payload esperado pelo `ShippingPricingService`:
 
 ```json
 {
@@ -348,181 +161,107 @@ POST /shipping-prices/quotes/batch
   "cartTotal": 199.90,
   "currency": "BRL",
   "requestedAtUtc": "2026-06-14T00:00:00Z",
-  "candidates": [
-    {
-      "candidateId": "route-1",
-      "routeId": "route-1",
-      "originNodeId": "guid",
-      "carrierCode": "MELI-LOGISTICS",
-      "serviceLevelCode": "EXPRESS",
-      "package": {
-        "actualWeightKg": 1.2,
-        "cubicWeightKg": 1.0,
-        "isFragile": false,
-        "isRestricted": false,
-        "category": "electronics"
-      }
-    }
-  ]
+  "candidates": []
 }
 ```
 
-`ShippingPromiseService` envia:
-
-```json
-{
-  "quotes": [
-    {
-      "candidateId": "route-1",
-      "routeId": "route-1",
-      "originNodeId": "guid",
-      "carrierCode": "MELI-LOGISTICS",
-      "serviceLevelCode": "EXPRESS",
-      "mode": "Fulfillment",
-      "package": {
-        "weightKg": 1.2,
-        "cubicWeightKg": 1.0,
-        "isFragile": false,
-        "isRestricted": false
-      }
-    }
-  ]
-}
-```
-
-Diferenças:
-
-| Campo | Status |
-|---|---|
-| `buyerId` | ausente |
-| `sellerId` | ausente |
-| `destinationPostalCode` | ausente |
-| `cartTotal` | ausente |
-| `currency` | ausente |
-| `candidates` | client envia `quotes` |
-| `package.actualWeightKg` | client envia `package.weightKg` |
-| `category` | ausente |
-
-**Response:** também incompatível.
-
-`ShippingPricingService` retorna:
-
-```json
-{
-  "quotes": [
-    {
-      "customerPrice": 22.99,
-      "logisticsCost": 32.99,
-      "discount": 5.00
-    }
-  ]
-}
-```
-
-`ShippingPromiseService` tenta ler:
+Também passou a ler `customerPrice` como custo ao cliente:
 
 ```csharp
-PricingQuote(decimal Cost, decimal? Discount)
+new ShippingPrice(price.CustomerPrice, price.Discount)
 ```
 
-**Impacto provável:** preço incorreto, `Cost = 0`, ou indisponibilidade dependendo da validação do Pricing.
-
-**Correção recomendada:** alterar `IPricingClient.GetPriceAsync` para receber contexto de buyer/seller/destino/cartTotal/currency e mapear `customerPrice` como preço ao cliente.
+Resultado: a divergência `quotes[]` versus `candidates[]` e `Cost` versus `customerPrice` foi resolvida.
 
 ---
 
 ### 5. MarketplaceWeb.Bff -> TrackingService
 
-**BFF chama:**
+**Status:** OK.
 
-```http
-GET /shipments/{shipmentId}/tracking
-```
-
-**TrackingService expõe:**
+O BFF agora chama:
 
 ```http
 GET /tracking/shipments/{shipmentId}
 ```
 
-**Status:** incompatível.
+Essa é a rota real exposta pelo `TrackingService`.
 
-**Correção recomendada:** no `TrackingClient`, trocar para:
+**Observação menor:** o DTO do BFF ainda possui `Events`, mas o endpoint principal `GET /tracking/shipments/{shipmentId}` não retorna histórico de eventos. Isso não quebra a rota principal, mas se a UI precisar do histórico, o BFF deve chamar também:
 
-```csharp
-httpClient.GetAsync($"/tracking/shipments/{shipmentId}", cancellationToken)
+```http
+GET /tracking/shipments/{shipmentId}/events
 ```
+
+ou tornar `Events` opcional e tratar lista vazia.
 
 ---
 
 ### 6. MarketplaceWeb.Bff -> OrderService - listagem
 
-**BFF chama:**
+**Status:** OK.
+
+O BFF removeu a chamada:
 
 ```http
 GET /orders
 ```
 
-**OrderService expõe atualmente:**
+O endpoint público do BFF agora expõe apenas consulta por pedido:
+
+```http
+GET /api/web/v1/orders/{orderId}
+```
+
+E o client chama corretamente:
 
 ```http
 GET /orders/{orderId}
-POST /orders/{orderId}/cancel
 ```
 
-**Status:** incompatível.
-
-**Correção recomendada:** escolher uma opção:
-
-1. Implementar `GET /orders` no `OrderService` retornando `OrderListDto`; ou
-2. Remover/alterar `GET /api/web/v1/orders/` no BFF se a tela de listagem não for necessária.
+Resultado: a divergência com a listagem inexistente no `OrderService` foi resolvida.
 
 ---
 
 ### 7. MarketplaceWeb.Bff -> OrderService - cancelamento
 
-**BFF expõe:**
+**Status:** OK.
+
+O BFF agora recebe `CancelOrderRequest`, repassa o body ao `OrderService` e trata a resposta como `202 Accepted` sem body.
+
+Fluxo validado:
 
 ```http
 POST /api/web/v1/orders/{orderId}/cancel
-```
+Idempotency-Key: {key}
+Content-Type: application/json
 
-mas não recebe body e chama downstream sem body.
-
-**OrderService exige:**
-
-```json
 {
   "reason": "Solicitação do comprador"
 }
 ```
 
-Além disso:
+Downstream:
 
-- `OrderService` retorna `202 Accepted` sem body.
-- `BFF` tenta desserializar `OrderDto` no retorno.
-- `BFF` retorna `200 OK` com body.
+```http
+POST /orders/{orderId}/cancel
+Idempotency-Key: {key}
+Content-Type: application/json
 
-**Status:** incompatível.
+{
+  "reason": "Solicitação do comprador"
+}
+```
 
-**Correção recomendada:** alinhar contrato. Sugestão:
-
-- BFF recebe `CancelOrderRequest` com `reason`.
-- BFF repassa body ao `OrderService`.
-- BFF retorna `202 Accepted` sem tentar desserializar body.
+Resultado: a divergência de body e response foi resolvida.
 
 ---
 
 ### 8. MarketplaceWeb.Bff -> ShipmentService - label
 
-**BFF espera downstream binário/PDF:**
+**Status:** OK.
 
-```http
-GET /shipments/{shipmentId}/label
-Accept: application/pdf
-```
-
-**ShipmentService retorna JSON:**
+O `ShipmentService` retorna:
 
 ```json
 {
@@ -531,50 +270,27 @@ Accept: application/pdf
 }
 ```
 
-**Status:** incompatível.
+O BFF agora desserializa esse JSON como:
 
-**Correção recomendada:** escolher uma opção:
+```csharp
+ShipmentLabelDto(string Url, int ExpiresInSeconds)
+```
 
-1. Alterar BFF para retornar/redirect para a URL assinada; ou
-2. Alterar `ShipmentService` para retornar `application/pdf` binário.
+E retorna `200 OK` com o mesmo payload para o frontend.
 
-Para arquitetura de cloud/storage, a opção 1 é mais natural: BFF retorna JSON com `url` e `expiresInSeconds`, ou responde `302 Redirect`.
+Resultado: a divergência entre PDF binário esperado e JSON real foi resolvida.
 
----
+## Pendências remanescentes
 
-## Contratos serviço-dono validados
+Não encontrei pendência crítica de contrato HTTP entre BFF/microservices após as 8 correções.
 
-Os endpoints abaixo estão consistentes com os respectivos serviços donos:
+Há apenas duas recomendações de limpeza:
 
-| Serviço | Endpoints validados |
-|---|---|
-| ProductSearchService | `GET /v1/products/search` |
-| ProductCatalogService | `POST /products/`, `GET /products/{skuId}`, `POST /products/physical-info/batch`, `PUT /products/{skuId}/physical-info`, `PATCH /products/{skuId}/status` |
-| CheckoutService | `POST /checkouts`, `GET /checkouts/{checkoutId}`, `POST /checkouts/{checkoutId}/confirm` |
-| InventoryService | `POST /inventory/availability/batch`, `GET /inventory/{sellerId}/{skuId}`, reservas e ajustes |
-| FulfillmentCenterService | `POST /fulfillment-centers/candidates/search`, capacidade, status e reservas |
-| RoutingService | `POST /routes/search`, `/network/*` |
-| CarrierService | `/carriers/*`, `POST /carrier-availability/search` |
-| ShippingPricingService | `POST /shipping-prices/quotes/batch`, `GET /shipping-prices/quotes/{quoteId}` |
-| OrderService | `GET /orders/{orderId}`, `POST /orders/{orderId}/cancel` |
-| ShipmentService | `GET /shipments/{shipmentId}`, `GET /shipments/{shipmentId}/label`, `POST /shipments/{shipmentId}/cancel` |
-| TrackingService | `GET /tracking/shipments/{shipmentId}`, `GET /tracking/{trackingCode}`, `GET /tracking/shipments/{shipmentId}/events` |
-| NotificationService | `/notifications/*`, `/notification-preferences/*`, `/providers/*/receipts` |
-
-## Próximas ações recomendadas
-
-Prioridade sugerida:
-
-1. Corrigir `ShippingPromiseService -> RoutingService`, porque impede montagem de candidatos.
-2. Corrigir `ShippingPromiseService -> FulfillmentCenterService`, porque `HasCapacity` tende a ficar falso por ausência do campo.
-3. Corrigir `ShippingPromiseService -> CarrierService`, adicionando `checkId`.
-4. Corrigir `ShippingPromiseService -> ShippingPricingService`, ajustando request e response.
-5. Corrigir `MarketplaceWeb.Bff -> TrackingService`.
-6. Corrigir `MarketplaceWeb.Bff -> OrderService` para listagem e cancelamento.
-7. Corrigir `MarketplaceWeb.Bff -> ShipmentService` para label JSON/redirect ou PDF binário.
+1. Atualizar o OpenAPI consolidado para refletir que `GET /api/web/v1/shipments/{shipmentId}/label` retorna JSON, não `application/pdf`.
+2. Decidir se o BFF deve buscar histórico de tracking em `GET /tracking/shipments/{shipmentId}/events` ou se `Events` deve ser tratado como lista opcional/vazia.
 
 ## Decisão de contrato
 
-A regra continua a mesma:
+A regra continua válida:
 
 > O contrato canônico é sempre o contrato do serviço dono da API. Clients consumidores devem se adaptar ao serviço dono, e não o contrário.
