@@ -1,0 +1,53 @@
+@startuml
+title 02 - Checkout e Pedido - Fluxo Feliz
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Checkout Service" as Checkout
+participant "Shipping Promise Service" as Promise
+database "Checkout DB" as CheckoutDb
+queue "Kafka" as Kafka
+participant "Order Service" as Order
+
+Comprador -> FE: Inicia compra
+FE -> BFF: POST /api/web/v1/checkouts/ + Idempotency-Key
+BFF -> Checkout: POST /checkouts + Idempotency-Key
+activate Checkout
+Checkout -> CheckoutDb: Consulta chave idempotente
+alt Checkout existente
+  CheckoutDb --> Checkout: Checkout salvo
+  Checkout --> BFF: 201 Created CheckoutResponse
+else Novo checkout
+  Checkout -> Promise: POST /shipping-promises/
+  Promise --> Checkout: Promessa disponível
+  Checkout -> CheckoutDb: Persiste checkout e itens
+  Checkout -> CheckoutDb: Registra evento de checkout criado
+  Checkout --> BFF: 201 Created CheckoutResponse
+end
+deactivate Checkout
+BFF --> FE: Checkout criado
+FE --> Comprador: Exibe resumo
+
+Comprador -> FE: Confirma checkout
+FE -> BFF: POST /api/web/v1/checkouts/{checkoutId}/confirm + Idempotency-Key
+BFF -> Checkout: POST /checkouts/{checkoutId}/confirm + Idempotency-Key
+activate Checkout
+Checkout -> CheckoutDb: Consulta chave idempotente de confirmação
+alt Confirmação existente
+  CheckoutDb --> Checkout: Checkout confirmado
+  Checkout --> BFF: 200 OK CheckoutResponse
+else Nova confirmação
+  Checkout -> CheckoutDb: Valida status Created e validade
+  Checkout -> CheckoutDb: Atualiza status para Confirmed
+  Checkout -> CheckoutDb: Registra evento CheckoutConfirmedIntegrationEvent
+  Checkout -> Kafka: Publica CheckoutConfirmedIntegrationEvent
+  Checkout --> BFF: 200 OK CheckoutResponse
+end
+deactivate Checkout
+BFF --> FE: Checkout confirmado
+Kafka -> Order: Consome CheckoutConfirmedIntegrationEvent
+Order -> Order: Inicia saga do pedido
+
+@enduml
