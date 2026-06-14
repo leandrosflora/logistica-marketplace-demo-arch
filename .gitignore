@@ -19,3 +19,6 @@ node_modules/
 /.vs/ProjectSettings.json
 /.vs/meli-envios-architecture/FileContentIndex/1d2bf4f5-edd8-47fc-9115-d913bff9fef7.vsidx
 *.vsidx
+/.vs/VSWorkspaceState.json
+/.vs/meli-envios-architecture/v17/DocumentLayout.json
+/.vs/meli-envios-architecture/v17/.wsuo
