@@ -14,3 +14,8 @@ Thumbs.db
 bin/
 obj/
 node_modules/
+/.vs/meli-envios-architecture/CopilotIndices/17.14.1686.8233
+/.vs/slnx.sqlite
+/.vs/ProjectSettings.json
+/.vs/meli-envios-architecture/FileContentIndex/1d2bf4f5-edd8-47fc-9115-d913bff9fef7.vsidx
+*.vsidx
