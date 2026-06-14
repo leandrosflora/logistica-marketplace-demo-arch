@@ -1,0 +1,51 @@
+@startuml
+' C4 Nível 3 - domínio Pedido
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Meli Envios - C4 Nível 3 - Domínio Pedido e Kafka
+caption Foco no ponto em que a jornada sai do fluxo síncrono de checkout e passa a publicar eventos para a cadeia de envios.
+
+Person(buyer, "Comprador", "Confirma a compra no marketplace")
+
+System_Boundary(platform, "Meli Envios Platform") {
+  Component(web, "Marketplace Web", "ASP.NET Core Razor", "Canal web")
+  Component(bff, "MarketplaceWeb.Bff", ".NET 8 BFF", "API orientada à experiência web")
+  Component(checkout, "Checkout Service", ".NET 8", "Cria e confirma checkout")
+  Component(promise, "Shipping Promise Service", ".NET 8", "Calcula promessa de entrega usada no checkout")
+  Component(order, "Order Service", ".NET 8", "Cria pedido após checkout confirmado")
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Backbone assíncrono de eventos")
+  Component(orderCreatedTopic, "Topic: order.created", "Kafka Topic", "Pedido criado e pronto para criação de shipment")
+
+  Component(shipment, "Shipment Service", ".NET 8", "Consome pedido criado para criar entrega física")
+  Component(notification, "Notification Service", ".NET 8", "Consome pedido criado para notificar comprador/seller")
+  Component(audit, "Audit Service", "Event Consumer", "Consome eventos para rastreabilidade")
+}
+
+Rel(buyer, web, "Confirma compra", "HTTPS")
+Rel(web, bff, "POST /api/web/v1/checkouts/{checkoutId}/confirm", "HTTPS/JSON")
+Rel(bff, checkout, "POST /checkouts/{checkoutId}/confirm", "HTTP/JSON")
+Rel(checkout, promise, "Revalida promessa quando necessário", "HTTP/JSON")
+Rel(checkout, order, "Solicita criação do pedido", "HTTP ou evento interno")
+Rel(order, kafka, "Publica evento", "Kafka producer")
+Rel(kafka, orderCreatedTopic, "Armazena", "topic")
+Rel(orderCreatedTopic, shipment, "Consome", "Kafka consumer")
+Rel(orderCreatedTopic, notification, "Consome", "Kafka consumer")
+Rel(orderCreatedTopic, audit, "Consome", "Kafka consumer")
+
+note right of order
+Order Service é o dono do evento order.created.
+Ele não cria shipment diretamente no domínio de envio físico;
+apenas publica o evento para os consumidores interessados.
+end note
+
+note bottom of orderCreatedTopic
+Contrato documentado em:
+docs/contracts/kafka-events.md
+- Publicado por: order-service
+- Consumido por: shipment-service, notification-service, audit-service
+end note
+
+@enduml
