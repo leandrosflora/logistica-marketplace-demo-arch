@@ -22,6 +22,33 @@ meli-envios-architecture
 
 Este case modela uma plataforma de cálculo de frete, promessa de entrega, disponibilidade logística e criação de shipment para milhões de pedidos por dia.
 
+## Repositórios envolvidos
+
+### Canal e BFF
+
+| Componente | Repositório |
+|---|---|
+| Frontend | [MarketplaceWeb](https://github.com/leandrosflora/MarketplaceWeb) |
+| BFF | [MarketplaceWeb.Bff](https://github.com/leandrosflora/MarketplaceWeb.Bff) |
+
+### Microservices
+
+| Microservice | Repositório |
+|---|---|
+| Checkout Service | [CheckoutService](https://github.com/leandrosflora/CheckoutService) |
+| Product Catalog Service | [ProductCatalogService](https://github.com/leandrosflora/ProductCatalogService) |
+| Product Search Service | [ProductSearchService](https://github.com/leandrosflora/ProductSearchService) |
+| Shipping Promise Service | [ShippingPromiseService](https://github.com/leandrosflora/ShippingPromiseService) |
+| Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) |
+| Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) |
+| Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) |
+| Inventory Service | [InventoryService](https://github.com/leandrosflora/InventoryService) |
+| Routing Service | [RoutingService](https://github.com/leandrosflora/RoutingService) |
+| Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) |
+| Order Service | [OrderService](https://github.com/leandrosflora/OrderService) |
+| Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) |
+| Fulfillment Center Service | [FulfillmentCenterService](https://github.com/leandrosflora/FulfillmentCenterService) |
+
 ## Microservices principais
 
 | Serviço | Responsabilidade |
