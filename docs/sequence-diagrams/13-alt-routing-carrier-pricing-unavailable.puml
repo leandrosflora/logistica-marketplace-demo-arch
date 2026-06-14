@@ -1,0 +1,47 @@
+@startuml
+title 13 - Fluxo Alternativo - Rota, Carrier ou Preço Indisponível
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Shipping Promise Service" as Promise
+participant "Fulfillment Center Service" as FC
+participant "Routing Service" as Routing
+participant "Carrier Service" as Carrier
+participant "Shipping Pricing Service" as Pricing
+
+Comprador -> FE: Solicita cotação de frete
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?zipCode={cep}
+BFF -> Promise: POST /shipping-promises/
+Promise -> FC: POST /fulfillment-centers/candidates/search
+FC --> Promise: Candidatos disponíveis
+
+Promise -> Routing: POST /routes/search
+alt Sem rota logística
+  Routing --> Promise: routes=[]
+  Promise --> BFF: available=false, unavailableReason="No route available"
+  BFF --> FE: Sem entrega para o CEP
+else Rota encontrada
+  Routing --> Promise: RouteSearchResponse com routes[]
+  Promise -> Carrier: POST /carrier-availability/search
+  alt Carrier indisponível
+    Carrier --> Promise: available=false
+    Promise --> BFF: available=false, unavailableReason="Carrier unavailable"
+    BFF --> FE: Sem opção de entrega no momento
+  else Carrier disponível
+    Carrier --> Promise: available=true
+    Promise -> Pricing: POST /shipping-prices/quotes/batch
+    alt Preço indisponível
+      Pricing --> Promise: available=false, unavailableReason="No rate card available"
+      Promise --> BFF: available=false, unavailableReason="Shipping price unavailable"
+      BFF --> FE: Não foi possível calcular frete
+    else Preço calculado
+      Pricing --> Promise: BatchShippingPriceResponse
+      Promise --> BFF: available=true
+      BFF --> FE: Exibe promessa de entrega
+    end
+  end
+end
+
+@enduml
