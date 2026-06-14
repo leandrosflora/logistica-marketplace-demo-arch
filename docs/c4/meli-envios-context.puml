@@ -1,4 +1,5 @@
 @startuml
+' Rendered by .github/workflows/render-diagrams.yml using C4-PlantUML.
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
 title Meli Envios - C4 Nível 1 - Contexto
