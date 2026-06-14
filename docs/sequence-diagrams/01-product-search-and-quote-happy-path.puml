@@ -1,0 +1,50 @@
+@startuml
+'title and flow for product discovery and shipping quote happy path.
+title 01 - Busca de Produto e Cotação de Frete - Fluxo Feliz
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Product Search Service" as Search
+participant "Product Catalog Service" as Catalog
+participant "Shipping Promise Service" as Promise
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Routing Service" as Routing
+participant "Carrier Service" as Carrier
+participant "Shipping Pricing Service" as Pricing
+
+Comprador -> FE: Digita termo de busca
+FE -> BFF: GET /api/web/v1/products/search?query=iphone&page=1&pageSize=20
+BFF -> Search: GET /v1/products/search?query=iphone&page=1&pageSize=20
+Search --> BFF: ProductSearchResponse
+BFF --> FE: Product cards paginados
+FE --> Comprador: Lista produtos ofertados
+
+Comprador -> FE: Seleciona produto e informa CEP
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?quantity=1&zipCode={cep}
+BFF -> Catalog: GET /products/{skuId}
+Catalog --> BFF: ProductResponse
+
+BFF -> Promise: POST /shipping-promises/
+activate Promise
+Promise -> Catalog: POST /products/physical-info/batch
+Catalog --> Promise: ProductPhysicalInfoResponse[]
+Promise -> Inventory: POST /inventory/availability/batch
+Inventory --> Promise: InventoryAvailabilityResponse[]
+Promise -> FC: POST /fulfillment-centers/candidates/search
+FC --> Promise: FulfillmentCandidateResponse[]
+Promise -> Routing: POST /routes/search
+Routing --> Promise: RouteSearchResponse
+Promise -> Carrier: POST /carrier-availability/search
+Carrier --> Promise: CarrierAvailabilitySearchResponse
+Promise -> Pricing: POST /shipping-prices/quotes/batch
+Pricing --> Promise: BatchShippingPriceResponse
+Promise --> BFF: ShippingPromiseResponse available=true
+deactivate Promise
+
+BFF --> FE: ProductPageResponse com product + shipping
+FE --> Comprador: Exibe preço, prazo, carrier e custo
+
+@enduml
