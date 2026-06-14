@@ -1,0 +1,36 @@
+@startuml
+title 10 - Fluxo Alternativo - Produto ou Catálogo Indisponível
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Product Catalog Service" as Catalog
+participant "Shipping Promise Service" as Promise
+participant "Product Search Service" as Search
+
+Comprador -> FE: Abre página do produto
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?zipCode={cep}
+BFF -> Catalog: GET /products/{skuId}
+
+alt Produto não encontrado
+  Catalog --> BFF: 404 Not Found
+  BFF --> FE: 404 Produto indisponível
+  FE --> Comprador: Exibe mensagem de item indisponível
+else Produto existe, mas sem dados físicos
+  Catalog --> BFF: ProductResponse
+  BFF -> Promise: POST /shipping-promises/
+  Promise -> Catalog: POST /products/physical-info/batch
+  Catalog --> Promise: Lista vazia ou SKU ausente
+  Promise --> BFF: available=false, unavailableReason="Product information unavailable"
+  BFF --> FE: ProductPageResponse com warning de frete
+  FE --> Comprador: Exibe produto sem promessa de entrega
+else Busca sem resultado
+  FE -> BFF: GET /api/web/v1/products/search?query={texto}
+  BFF -> Search: GET /v1/products/search?query={texto}
+  Search --> BFF: items=[]
+  BFF --> FE: Resultado vazio
+  FE --> Comprador: Sugere nova busca/filtros
+end
+
+@enduml
