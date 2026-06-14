@@ -38,21 +38,25 @@ jobs:
 
       - name: Show generated diagram changes
         run: |
-          git status --short
+          git status --short -- docs/c4 docs/sequence-diagrams
 
       - name: Fail PR when generated SVGs are out of date
         if: github.event_name == 'pull_request'
         run: |
-          if ! git diff --quiet -- docs/c4 docs/sequence-diagrams; then
+          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
+
+          if ! git diff --cached --quiet -- docs/c4 docs/sequence-diagrams; then
             echo "Generated SVG files are out of date. Run the PlantUML render command locally and commit the changes."
-            git diff -- docs/c4 docs/sequence-diagrams
+            git diff --cached -- docs/c4 docs/sequence-diagrams
             exit 1
           fi
 
       - name: Commit generated SVGs
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          if git diff --quiet -- docs/c4 docs/sequence-diagrams; then
+          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
+
+          if git diff --cached --quiet -- docs/c4 docs/sequence-diagrams; then
             echo "No generated diagram changes to commit."
             exit 0
           fi
@@ -60,6 +64,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
           git commit -m "chore: render PlantUML diagrams [skip ci]"
           git push
