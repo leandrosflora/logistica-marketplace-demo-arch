@@ -1,0 +1,73 @@
+@startuml
+' Jornada completa de envios - visão macro do fluxo feliz.
+title 00 - Jornada de Envios - Fluxo Feliz Macro
+
+autonumber
+actor Buyer as Comprador
+participant "Marketplace Web" as FE
+participant "Marketplace BFF" as BFF
+participant "Product Search Service" as Search
+participant "Product Catalog Service" as Catalog
+participant "Shipping Promise Service" as Promise
+participant "Checkout Service" as Checkout
+participant "Order Service" as Order
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Routing Service" as Routing
+participant "Carrier Service" as Carrier
+participant "Shipping Pricing Service" as Pricing
+participant "Shipment Service" as Shipment
+participant "Tracking Service" as Tracking
+participant "Notification Service" as Notification
+queue "Kafka" as Kafka
+
+Comprador -> FE: Pesquisa produto
+FE -> BFF: GET /api/web/v1/products/search?query={texto}
+BFF -> Search: GET /v1/products/search?query={texto}
+Search --> BFF: Produtos paginados
+BFF --> FE: Cards de produto
+
+Comprador -> FE: Seleciona produto e informa CEP
+FE -> BFF: GET /api/web/v1/products/{skuId}/page?zipCode={cep}
+BFF -> Catalog: GET /products/{skuId}
+BFF -> Promise: POST /shipping-promises/
+Promise -> Catalog: POST /products/physical-info/batch
+Promise -> Inventory: POST /inventory/availability/batch
+Promise -> FC: POST /fulfillment-centers/candidates/search
+Promise -> Routing: POST /routes/search
+Promise -> Carrier: POST /carrier-availability/search
+Promise -> Pricing: POST /shipping-prices/quotes/batch
+Promise --> BFF: Promessa disponível
+BFF --> FE: Página de produto com frete
+
+Comprador -> FE: Confirma compra
+FE -> BFF: POST /api/web/v1/checkouts/ + Idempotency-Key
+BFF -> Checkout: POST /checkouts + Idempotency-Key
+Checkout -> Promise: POST /shipping-promises/
+Checkout --> BFF: Checkout criado
+BFF --> FE: Checkout criado
+
+FE -> BFF: POST /api/web/v1/checkouts/{checkoutId}/confirm
+BFF -> Checkout: POST /checkouts/{checkoutId}/confirm
+Checkout -> Kafka: CheckoutConfirmedIntegrationEvent
+Kafka -> Order: Consome CheckoutConfirmedIntegrationEvent
+Order -> Kafka: ReserveInventoryCommand
+Order -> Kafka: ReserveFulfillmentCapacityCommand
+Kafka -> Inventory: Reserva estoque
+Kafka -> FC: Reserva capacidade
+Inventory -> Kafka: InventoryReservedIntegrationEvent
+FC -> Kafka: FulfillmentCapacityReservedIntegrationEvent
+Kafka -> Order: Confirma reservas recebidas
+Order -> Kafka: AuthorizePaymentCommand
+Order -> Kafka: ConfirmInventoryReservationCommand
+Order -> Kafka: ConfirmFulfillmentCapacityCommand
+Order -> Kafka: CreateShipmentCommand
+Kafka -> Shipment: Cria shipment
+Shipment -> Carrier: Booking / geração de etiqueta
+Carrier --> Shipment: Tracking code + label
+Shipment -> Kafka: ShipmentCreatedIntegrationEvent
+Kafka -> Tracking: Cria projeção de tracking
+Kafka -> Notification: Notifica shipment criado
+Notification --> Comprador: Push/e-mail/SMS
+
+@enduml
