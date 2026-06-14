@@ -2,6 +2,8 @@
 
 ## Envelope padrão
 
+Todos os eventos canônicos Kafka devem usar o envelope abaixo:
+
 ```json
 {
   "eventId": "uuid",
@@ -14,30 +16,48 @@
 }
 ```
 
-## Tópicos
+## Regras de contrato
+
+1. `eventType` deve ser igual ao nome do tópico canônico.
+2. `eventId` deve ser globalmente único.
+3. `correlationId` deve ser propagado entre serviços.
+4. `payload` deve conter todos os campos necessários para os consumers declarados.
+5. Eventos canônicos representam fatos de negócio já ocorridos.
+6. Comandos internos de saga não devem ser tratados como eventos canônicos.
+
+## Tópicos canônicos
 
 ### `checkout.shipping.quote.requested`
 
 Publicado por: `checkout-service`
 
-Consumido por: `audit-service`, `analytics`
+Consumido por: `shipping-promise-service`, `audit-service`, `analytics`
 
-Payload:
+Payload canônico esperado:
 
 ```json
 {
-  "checkoutId": "chk_123",
-  "buyerId": "usr_123",
-  "destinationZipCode": "05700-000",
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "destination": {
+    "zipCode": "05700-000",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "BR"
+  },
   "items": [
     {
-      "sku": "SKU-123",
-      "sellerId": "seller-1",
-      "quantity": 1
+      "skuId": "uuid",
+      "sellerId": "uuid",
+      "quantity": 1,
+      "unitPrice": 129.9
     }
   ]
 }
 ```
+
+Observação: o `checkoutId` deve ser propagado no fluxo de promise para permitir que o `CheckoutService` associe a resposta assíncrona ao checkout original.
 
 ### `shipping.promise.calculated`
 
@@ -45,23 +65,24 @@ Publicado por: `shipping-promise-service`
 
 Consumido por: `checkout-service`, `audit-service`, `analytics`
 
-Payload:
+Payload canônico esperado:
 
 ```json
 {
-  "checkoutId": "chk_123",
-  "promises": [
-    {
-      "sku": "SKU-123",
-      "available": true,
-      "shippingMode": "same_day",
-      "estimatedDeliveryDate": "2026-06-15",
-      "price": 14.9,
-      "currency": "BRL"
-    }
-  ]
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "promiseId": "promise_123",
+  "mode": "same_day",
+  "carrier": "carrier_1",
+  "estimatedDeliveryDate": "2026-06-15",
+  "cost": 14.9,
+  "currency": "BRL",
+  "source": "calculated"
 }
 ```
+
+Observação: `checkoutId` é obrigatório para o consumer do `CheckoutService`.
 
 ### `order.created`
 
@@ -69,22 +90,50 @@ Publicado por: `order-service`
 
 Consumido por: `shipment-service`, `notification-service`, `audit-service`
 
-Payload:
+Payload canônico esperado para o E2E atual:
 
 ```json
 {
-  "orderId": "ord_123",
-  "buyerId": "usr_123",
-  "items": [
+  "orderId": "uuid",
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "shippingPromiseId": "promise_123",
+  "routeId": "route_123",
+  "carrierCode": "carrier_1",
+  "serviceLevelCode": "same_day",
+  "originNodeId": "uuid",
+  "promisedDeliveryDate": "2026-06-15",
+  "destination": {
+    "street": "Av. Paulista",
+    "number": "1000",
+    "city": "São Paulo",
+    "state": "SP",
+    "zipCode": "01310-100",
+    "country": "BR"
+  },
+  "packages": [
     {
-      "sku": "SKU-123",
-      "sellerId": "seller-1",
-      "quantity": 1
+      "packageId": "pkg_123",
+      "weightKg": 1.2,
+      "heightCm": 10,
+      "widthCm": 20,
+      "lengthCm": 30,
+      "items": [
+        {
+          "skuId": "uuid",
+          "quantity": 1
+        }
+      ]
     }
   ],
-  "shippingPromiseId": "promise_123"
+  "totalAmount": 129.9,
+  "currency": "BRL",
+  "createdAt": "2026-06-14T12:00:00Z"
 }
 ```
+
+Observação: se a arquitetura optar por manter `order.created` como evento limpo de domínio, a criação de shipment deve migrar para um comando interno, como `shipment.commands`, ou para um evento mais específico, como `shipment.requested`.
 
 ### `shipment.created`
 
@@ -92,17 +141,24 @@ Publicado por: `shipment-service`
 
 Consumido por: `tracking-service`, `notification-service`, `audit-service`
 
-Payload:
+Payload canônico esperado:
 
 ```json
 {
-  "shipmentId": "shp_123",
-  "orderId": "ord_123",
-  "carrierId": "carrier_1",
+  "shipmentId": "uuid",
+  "orderId": "uuid",
+  "buyerId": "uuid",
+  "carrierCode": "carrier_1",
+  "serviceLevelCode": "same_day",
+  "externalShipmentId": "ext_123",
   "trackingCode": "BR123456789",
-  "status": "created"
+  "labelObjectKey": "labels/shp_123.pdf",
+  "estimatedDeliveryDate": "2026-06-15",
+  "createdAt": "2026-06-14T12:00:00Z"
 }
 ```
+
+Observação: `orderId` e `buyerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório.
 
 ### `shipment.status.updated`
 
@@ -110,17 +166,24 @@ Publicado por: `tracking-service`
 
 Consumido por: `notification-service`, `audit-service`, `order-service`
 
-Payload:
+Payload canônico esperado:
 
 ```json
 {
-  "shipmentId": "shp_123",
-  "orderId": "ord_123",
+  "shipmentId": "uuid",
+  "orderId": "uuid",
+  "buyerId": "uuid",
+  "trackingCode": "BR123456789",
+  "carrierCode": "carrier_1",
   "previousStatus": "in_transit",
   "currentStatus": "delivered",
-  "statusDate": "2026-06-16T18:00:00Z"
+  "statusDate": "2026-06-16T18:00:00Z",
+  "estimatedDeliveryDate": "2026-06-16",
+  "exceptionCode": null
 }
 ```
+
+Observação: `orderId` é obrigatório para atualização do pedido no `OrderService`; `buyerId` é obrigatório para planejamento de notificação no `NotificationService`.
 
 ## Tópicos internos de saga — OrderService
 
