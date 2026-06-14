@@ -84,8 +84,10 @@ Principais tópicos:
 
 ## Contratos
 
+- [`docs/contracts/README.md`](docs/contracts/README.md)
 - [`docs/contracts/services-map.md`](docs/contracts/services-map.md)
-- [`docs/contracts/shipping-promise-api.yaml`](docs/contracts/shipping-promise-api.yaml)
+- [`docs/contracts/meli-envios-apis.openapi.yaml`](docs/contracts/meli-envios-apis.openapi.yaml)
+- [`docs/contracts/api-contract-validation.md`](docs/contracts/api-contract-validation.md)
 - [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md)
 
 ## Diagramas
@@ -117,7 +119,7 @@ docker compose up -d
 Validar arquivos YAML:
 
 ```bash
-docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/shipping-promise-api.yaml
+docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/meli-envios-apis.openapi.yaml
 ```
 
 Validar PlantUML:
