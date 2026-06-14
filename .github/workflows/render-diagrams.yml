@@ -1,17 +1,16 @@
 name: Render PlantUML diagrams
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
-      - 'docs/c4/**/*.puml'
-      - 'docs/sequence-diagrams/**/*.puml'
+      - 'docs/**/*.puml'
       - '.github/workflows/render-diagrams.yml'
   pull_request:
     paths:
-      - 'docs/c4/**/*.puml'
-      - 'docs/sequence-diagrams/**/*.puml'
+      - 'docs/**/*.puml'
       - '.github/workflows/render-diagrams.yml'
 
 permissions:
@@ -19,7 +18,7 @@ permissions:
 
 jobs:
   render-diagrams:
-    name: Render SVG diagrams from PlantUML
+    name: Render SVG diagrams from C4-PlantUML and PlantUML
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Render PlantUML diagrams as SVG
+      - name: Render C4-PlantUML and sequence diagrams as SVG
         run: |
           docker run --rm \
             -v "$PWD:/work" \
@@ -51,7 +50,7 @@ jobs:
           fi
 
       - name: Commit generated SVGs
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           if git diff --quiet -- docs/c4 docs/sequence-diagrams; then
             echo "No generated diagram changes to commit."
