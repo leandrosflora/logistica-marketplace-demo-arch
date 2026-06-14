@@ -1,0 +1,45 @@
+@startuml
+title 14 - Fluxo Alternativo - Falha de Autorização e Compensações
+
+autonumber
+queue "Kafka" as Kafka
+participant "Order Service" as Order
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Payment Platform" as Payment
+participant "Notification Service" as Notification
+
+database "Order DB" as OrderDb
+
+Kafka -> Order: InventoryReservedIntegrationEvent
+Kafka -> Order: FulfillmentCapacityReservedIntegrationEvent
+activate Order
+Order -> OrderDb: Pedido com estoque e capacidade reservados
+Order -> Kafka: AuthorizePaymentCommand
+deactivate Order
+
+Kafka -> Payment: AuthorizePaymentCommand
+activate Payment
+Payment --> Kafka: PaymentAuthorizationFailedIntegrationEvent
+deactivate Payment
+
+Kafka -> Order: PaymentAuthorizationFailedIntegrationEvent
+activate Order
+Order -> OrderDb: Marca pedido como Cancelled
+Order -> Kafka: ReleaseInventoryReservationCommand
+Order -> Kafka: ReleaseFulfillmentCapacityCommand
+Order -> Kafka: OrderCancelledIntegrationEvent
+deactivate Order
+
+Kafka -> Inventory: ReleaseInventoryReservationCommand
+Inventory -> Inventory: Libera reserva pendente
+Inventory -> Kafka: InventoryReservationReleasedIntegrationEvent
+
+Kafka -> FC: ReleaseFulfillmentCapacityCommand
+FC -> FC: Libera reserva pendente
+FC -> Kafka: FulfillmentCapacityReleasedIntegrationEvent
+
+Kafka -> Notification: OrderCancelledIntegrationEvent
+Notification -> Notification: Cria notificação de falha na compra
+
+@enduml
