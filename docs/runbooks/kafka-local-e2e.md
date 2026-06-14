@@ -4,6 +4,14 @@
 
 Executar e validar localmente a comunicação Kafka entre os microservices do case Meli Envios.
 
+## Status atual
+
+Status: **parcialmente pronto**.
+
+A infraestrutura Kafka local está pronta, mas o E2E completo ainda depende de alinhamento de payload entre producers e consumers.
+
+Revisão relacionada: [`docs/reviews/kafka-e2e-contract-review-2026-06-14.md`](../reviews/kafka-e2e-contract-review-2026-06-14.md).
+
 ## Endpoints locais
 
 | Recurso | Endereço |
@@ -48,6 +56,22 @@ docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092
 docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.status.updated --partitions 1 --replication-factor 1
 ```
 
+## Criar tópicos internos de saga do OrderService
+
+Esses tópicos foram formalizados pela [`ADR-0001`](../adr/0001-order-service-internal-saga-topics.md).
+
+```bash
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic inventory.commands --partitions 1 --replication-factor 1
+
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic fulfillment.commands --partitions 1 --replication-factor 1
+
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic payment.commands --partitions 1 --replication-factor 1
+
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.commands --partitions 1 --replication-factor 1
+
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic order.events --partitions 1 --replication-factor 1
+```
+
 Se o tópico já existir, o comando pode retornar erro de tópico existente. Isso não bloqueia o teste.
 
 Listar tópicos:
@@ -58,23 +82,41 @@ docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092
 
 ## Microservices com Kafka implementado
 
-| Serviço | Producer | Consumer | Consumer group |
-|---|---|---|---|
-| `OrderService` | `order.created` | `shipment.status.updated` | `order-service` |
-| `ShipmentService` | `shipment.created` | `order.created` | `shipment-service` |
-| `TrackingService` | `shipment.status.updated` | `shipment.created` | `tracking-service` |
-| `NotificationService` | - | `order.created`, `shipment.created`, `shipment.status.updated` | `notification-service` |
-| `ShippingPromiseService` | `shipping.promise.calculated` | - | `shipping-promise-service` |
-
-Pendente:
-
-| Serviço | Pendência |
-|---|---|
-| `CheckoutService` | Implementar producer `checkout.shipping.quote.requested` e consumer `shipping.promise.calculated` |
+| Serviço | Producer | Consumer | Consumer group | Status |
+|---|---|---|---|---|
+| `CheckoutService` | `checkout.shipping.quote.requested` | `shipping.promise.calculated` | `checkout-service` | Parcial: consumer apenas em modo DB-backed |
+| `ShippingPromiseService` | `shipping.promise.calculated` | - | `shipping-promise-service` | Parcial: não consome `checkout.shipping.quote.requested` |
+| `OrderService` | `order.created` e tópicos internos de saga | `shipment.status.updated` | `order-service` | Parcial: payload incompatível com consumers atuais |
+| `ShipmentService` | `shipment.created` | `order.created` | `shipment-service` | Parcial: espera payload mais rico que o publicado pelo `OrderService` |
+| `TrackingService` | `shipment.status.updated` | `shipment.created` | `tracking-service` | Parcial: não propaga `orderId`/`buyerId` para status |
+| `NotificationService` | - | `order.created`, `shipment.created`, `shipment.status.updated` | `notification-service` | Parcial: depende de campos ausentes em alguns eventos |
 
 ## Ordem recomendada para teste por fases
 
-### Fase 1 - Pedido, shipment, tracking e notification
+### Fase 0 - Infraestrutura Kafka
+
+Objetivo:
+
+1. Subir Kafka, Kafka UI, Redis e Postgres.
+2. Criar tópicos canônicos.
+3. Criar tópicos internos de saga.
+4. Validar tópicos no Kafka UI.
+
+### Fase 1 - Smoke test por tópico
+
+Antes do E2E entre serviços, validar produção/consumo manual dos tópicos:
+
+```text
+checkout.shipping.quote.requested
+shipping.promise.calculated
+order.created
+shipment.created
+shipment.status.updated
+```
+
+Use `kafka-console-producer` e `kafka-console-consumer` para validar conectividade básica.
+
+### Fase 2 - Pedido, shipment, tracking e notification
 
 Rodar serviços:
 
@@ -93,33 +135,26 @@ shipment.created
 shipment.status.updated
 ```
 
-Objetivo:
+Objetivo esperado:
 
 1. `OrderService` publica `order.created`.
 2. `ShipmentService` consome `order.created` e publica `shipment.created`.
 3. `TrackingService` consome `shipment.created` e publica `shipment.status.updated`.
 4. `NotificationService` consome os três eventos.
+5. `OrderService` consome `shipment.status.updated`.
 
-### Fase 2 - Promise assíncrona
+Bloqueio atual:
 
-Adicionar:
+- O payload de `order.created` publicado pelo `OrderService` não contém todos os campos que o `ShipmentService` espera.
+- O payload de `shipment.status.updated` publicado pelo `TrackingService` não contém todos os campos que `OrderService` e `NotificationService` esperam.
 
-```text
-ShippingPromiseService
-```
+### Fase 3 - Promise assíncrona
 
-Tópico usado:
-
-```text
-shipping.promise.calculated
-```
-
-### Fase 3 - Checkout assíncrono completo
-
-Adicionar após implementação Kafka:
+Rodar serviços:
 
 ```text
 CheckoutService
+ShippingPromiseService
 ```
 
 Tópicos:
@@ -128,6 +163,19 @@ Tópicos:
 checkout.shipping.quote.requested
 shipping.promise.calculated
 ```
+
+Objetivo esperado:
+
+1. `CheckoutService` publica `checkout.shipping.quote.requested`.
+2. `ShippingPromiseService` consome `checkout.shipping.quote.requested`.
+3. `ShippingPromiseService` publica `shipping.promise.calculated`.
+4. `CheckoutService` consome `shipping.promise.calculated`.
+
+Bloqueio atual:
+
+- `ShippingPromiseService` ainda não possui consumer Kafka para `checkout.shipping.quote.requested`.
+- `shipping.promise.calculated` não contém `checkoutId`, que é exigido pela projeção do `CheckoutService`.
+- Em `CheckoutService`, o consumer de `shipping.promise.calculated` só é registrado em modo DB-backed; em mock mode, o serviço publica no Kafka, mas não consome a promise de retorno.
 
 ## Configuração esperada em appsettings.Development.json
 
@@ -148,8 +196,9 @@ Exemplo base:
 
 1. Alguns serviços ainda usam `DbContext`, `Inbox` e `Outbox` reais mesmo com repository mock habilitado.
 2. Para E2E real, aplique os schemas locais ou crie mocks transacionais para Inbox/Outbox.
-3. O `OrderService` ainda possui tópicos internos de saga não documentados no contrato canônico atual: `inventory.commands`, `fulfillment.commands`, `payment.commands`, `shipment.commands`, `order.events`.
-4. `CheckoutService` ainda não fecha o fluxo Kafka de quote/promise.
+3. O `OrderService` possui tópicos internos de saga documentados pela ADR-0001.
+4. Os contratos Kafka precisam ser alinhados antes do E2E completo.
+5. Rode `dotnet restore`, `dotnet build` e `dotnet test` em todos os microservices antes do teste integrado.
 
 ## Validação visual
 
@@ -160,11 +209,12 @@ No Kafka UI:
 3. Verifique os tópicos.
 4. Acompanhe mensagens nos tópicos canônicos.
 5. Confira consumer groups:
+   - `checkout-service`
+   - `shipping-promise-service`
    - `order-service`
    - `shipment-service`
    - `tracking-service`
    - `notification-service`
-   - `shipping-promise-service`
 
 ## Comandos úteis
 
