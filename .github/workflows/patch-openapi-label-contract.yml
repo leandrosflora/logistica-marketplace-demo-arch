@@ -1,0 +1,71 @@
+name: Patch OpenAPI label contract
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/patch-openapi-label-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-openapi:
+    name: Patch BFF shipment label contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch OpenAPI label response
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/contracts/meli-envios-apis.openapi.yaml')
+          text = path.read_text(encoding='utf-8')
+
+          old = """        '200':
+          description: Arquivo PDF da etiqueta
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+"""
+
+          new = """        '200':
+          description: URL temporária da etiqueta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
+"""
+
+          if old not in text:
+              print('Target block not found. File may already be patched.')
+          else:
+              text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8')
+              print('OpenAPI label response patched.')
+          PY
+
+      - name: Show changes
+        run: |
+          git diff -- docs/contracts/meli-envios-apis.openapi.yaml
+
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- docs/contracts/meli-envios-apis.openapi.yaml; then
+            echo "No OpenAPI changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add docs/contracts/meli-envios-apis.openapi.yaml
+          git commit -m "fix: update BFF shipment label OpenAPI contract"
+          git push
