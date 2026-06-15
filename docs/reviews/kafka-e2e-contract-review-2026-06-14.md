@@ -16,195 +16,179 @@ Repos avaliados:
 - `leandrosflora/NotificationService`
 - `leandrosflora/meli-envios-architecture`
 
+Referências:
+
+- [`docs/contracts/kafka-events.md`](../contracts/kafka-events.md)
+- [`docs/runbooks/kafka-local-e2e.md`](../runbooks/kafka-local-e2e.md)
+- [`docs/adr/0001-order-service-internal-saga-topics.md`](../adr/0001-order-service-internal-saga-topics.md)
+
 ## Resultado executivo
 
-Status: **não pronto para E2E Kafka completo**.
+Status: **pronto para validação E2E local por fases**.
 
-As integrações Kafka reais foram implementadas nos principais serviços, mas há desalinhamento de payload entre producers e consumers.
+As integrações Kafka reais foram implementadas e os principais payloads foram alinhados entre producers e consumers.
 
-O broker, os nomes de tópicos e os consumer groups estão majoritariamente corretos. O bloqueio está no contrato dos eventos.
+A revisão foi estática, baseada nos arquivos atuais dos repositórios. A validação final ainda deve executar `dotnet restore`, `dotnet build`, `dotnet test` e o runbook Kafka local.
+
+## Correções aplicadas
+
+### 1. `CheckoutService -> ShippingPromiseService`
+
+Status: **corrigido**.
+
+Correções observadas:
+
+- `CheckoutService` publica `checkout.shipping.quote.requested` com `checkoutId`, `buyerId`, `sellerId`, `destination` e `items`.
+- `ShippingPromiseService` passou a ter consumer Kafka para `checkout.shipping.quote.requested`.
+- O consumer valida `eventType == checkout.shipping.quote.requested`.
+- O consumer converte o payload recebido para `ShippingPromiseRequest` preservando `checkoutId` e `correlationId`.
+
+Resultado esperado:
+
+```text
+CheckoutService -> checkout.shipping.quote.requested -> ShippingPromiseService
+```
+
+### 2. `ShippingPromiseService -> CheckoutService`
+
+Status: **corrigido**.
+
+Correções observadas:
+
+- `ShippingPromiseCalculatedPayload` passou a incluir `checkoutId`.
+- O payload publicado por `shipping.promise.calculated` contém `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency` e `source`.
+- `CheckoutService` consome `shipping.promise.calculated` usando `checkoutId` para idempotência e projeção.
+
+Resultado esperado:
+
+```text
+ShippingPromiseService -> shipping.promise.calculated -> CheckoutService
+```
+
+### 3. `OrderService -> ShipmentService`
+
+Status: **corrigido**.
+
+Correções observadas:
+
+- `OrderCreatedIntegrationEvent` do `OrderService` foi enriquecido.
+- O evento agora contém os campos necessários para o `ShipmentService` criar a entrega:
+  - `orderId`
+  - `checkoutId`
+  - `buyerId`
+  - `sellerId`
+  - `shippingPromiseId`
+  - `routeId`
+  - `carrierCode`
+  - `serviceLevelCode`
+  - `originNodeId`
+  - `promisedDeliveryDate`
+  - `destination`
+  - `packages`
+  - `totalAmount`
+  - `currency`
+  - `createdAt`
+- O contrato de entrada do `ShipmentService` está alinhado com esse payload.
+
+Resultado esperado:
+
+```text
+OrderService -> order.created -> ShipmentService
+```
+
+### 4. `ShipmentService -> TrackingService / NotificationService`
+
+Status: **corrigido**.
+
+Correções observadas:
+
+- `ShipmentCreatedIntegrationEvent` passou a carregar `orderId` e `buyerId`.
+- O contrato usa `estimatedDeliveryDate` e `createdAt`.
+- O payload agora atende `TrackingService` e `NotificationService` sem lookup adicional obrigatório para identificar pedido/comprador.
+
+Resultado esperado:
+
+```text
+ShipmentService -> shipment.created -> TrackingService / NotificationService
+```
+
+### 5. `TrackingService -> OrderService / NotificationService`
+
+Status: **corrigido**.
+
+Correções observadas:
+
+- `TrackingStatusChangedIntegrationEvent` passou a carregar `orderId` e `buyerId`.
+- O evento usa `currentStatus`, `previousStatus` e `statusDate`.
+- O contrato atende:
+  - `OrderService`, que precisa de `orderId` para atualizar status da entrega no pedido;
+  - `NotificationService`, que precisa de `buyerId` para planejar comunicação.
+
+Resultado esperado:
+
+```text
+TrackingService -> shipment.status.updated -> OrderService / NotificationService
+```
+
+## Matriz final
+
+| Tópico | Producer | Consumers | Payload obrigatório | Status |
+|---|---|---|---|---|
+| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
+| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
+| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
+| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
 
 ## Validação por fluxo
 
-### 1. CheckoutService -> ShippingPromiseService
+### Fase 1 - Promise assíncrona
 
-Tópico esperado:
-
-```text
-checkout.shipping.quote.requested
-```
-
-Status: **parcial**.
-
-O `CheckoutService` publica `checkout.shipping.quote.requested`.
-
-Problema:
-
-- Não foi encontrada implementação de consumer Kafka no `ShippingPromiseService` para `checkout.shipping.quote.requested`.
-- O `ShippingPromiseService` continua publicando `shipping.promise.calculated` após cálculo HTTP síncrono.
-
-Impacto:
-
-- O fluxo assíncrono `checkout.shipping.quote.requested -> shipping.promise.calculated` ainda não fecha por Kafka.
-- Para E2E completo, o `ShippingPromiseService` precisa consumir `checkout.shipping.quote.requested` ou o runbook deve deixar claro que a fase de promise ainda depende de chamada HTTP.
-
-### 2. ShippingPromiseService -> CheckoutService
-
-Tópico:
+Fluxo esperado:
 
 ```text
-shipping.promise.calculated
+CheckoutService
+  -> checkout.shipping.quote.requested
+  -> ShippingPromiseService
+  -> shipping.promise.calculated
+  -> CheckoutService
 ```
 
-Status: **quebrado por contrato**.
+Status: **pronto para validação local**.
 
-O `CheckoutService` espera `checkoutId` no payload de `shipping.promise.calculated` para idempotência e projeção local.
+Validações esperadas:
 
-O `ShippingPromiseService` publica `shipping.promise.calculated` com `buyerId`, `sellerId`, `destination`, `items`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost` e `source`, mas sem `checkoutId`.
+- `checkout.shipping.quote.requested` contém `checkoutId`.
+- `shipping.promise.calculated` retorna o mesmo `checkoutId`.
+- `CheckoutService` registra/projeta a promise recebida.
 
-Impacto:
+### Fase 2 - Pedido, shipment, tracking e notification
 
-- O consumer do `CheckoutService` tende a registrar `Guid.Empty` como `checkoutId` ou falhar semanticamente.
-- A projeção `ShippingPromiseProjection` não consegue associar corretamente a promise ao checkout.
-
-Correção recomendada:
-
-- Incluir `checkoutId` no request/evento de promise.
-- Propagar `checkoutId` desde `checkout.shipping.quote.requested` até `shipping.promise.calculated`.
-
-### 3. OrderService -> ShipmentService
-
-Tópico:
+Fluxo esperado:
 
 ```text
-order.created
+OrderService
+  -> order.created
+  -> ShipmentService
+  -> shipment.created
+  -> TrackingService
+  -> shipment.status.updated
+  -> OrderService / NotificationService
 ```
 
-Status: **quebrado por contrato**.
+Status: **pronto para validação local**.
 
-O `OrderService` publica payload reduzido:
+Validações esperadas:
 
-- `messageId`
-- `orderId`
-- `checkoutId`
-- `buyerId`
-- `sellerId`
-- `totalAmount`
-- `currency`
-- `createdAt`
-
-O `ShipmentService` consome `order.created` esperando campos logísticos adicionais:
-
-- `shippingPromiseId`
-- `routeId`
-- `carrierCode`
-- `serviceLevelCode`
-- `originNodeId`
-- `promisedDeliveryDate`
-- `destination`
-- `packages`
-
-Impacto:
-
-- O `ShipmentService` não tem dados suficientes para criar shipment a partir do evento real publicado pelo `OrderService`.
-- O E2E `order.created -> shipment.created` não deve funcionar corretamente sem ajuste.
-
-Correções possíveis:
-
-1. Enriquecer `order.created` com os dados logísticos necessários ao `ShipmentService`.
-2. Alterar o fluxo para o `ShipmentService` consumir um comando interno de saga, como `shipment.commands`, em vez de consumir `order.created` diretamente.
-3. Criar um evento canônico intermediário mais explícito, como `shipment.requested`, emitido pelo `OrderService` após validação da saga.
-
-Recomendação arquitetural: **usar `shipment.commands` ou `shipment.requested` para criação de shipment**, mantendo `order.created` como fato de domínio mais limpo.
-
-### 4. ShipmentService -> TrackingService
-
-Tópico:
-
-```text
-shipment.created
-```
-
-Status: **parcial**.
-
-O `ShipmentService` publica `shipment.created` com campos próximos do necessário para o `TrackingService`.
-
-Problemas:
-
-- `TrackingService` espera `estimatedDeliveryDate`, mas `ShipmentService` publica `promisedDeliveryDate`.
-- `TrackingService` espera `createdAt`, mas `ShipmentService` publica `occurredAt` dentro do payload e também `occurredAt` no envelope.
-- `ShipmentService` publica `trackingCode` como `string.Empty` no momento da criação.
-
-Impacto:
-
-- O consumer pode desserializar, mas com campos importantes vazios/nulos.
-- A geração do primeiro status de tracking pode ocorrer com `trackingCode` vazio.
-
-Correção recomendada:
-
-- Padronizar nomes no contrato canônico: `estimatedDeliveryDate` e `createdAt`.
-- Garantir tracking code real quando disponível ou declarar explicitamente que `trackingCode` pode ser nulo no evento inicial.
-
-### 5. TrackingService -> OrderService / NotificationService
-
-Tópico:
-
-```text
-shipment.status.updated
-```
-
-Status: **quebrado por contrato**.
-
-O `TrackingService` publica o payload com base em `TrackingStatusChangedIntegrationEvent`, contendo:
-
-- `messageId`
-- `correlationId`
-- `shipmentId`
-- `trackingCode`
-- `carrierCode`
-- `previousStatus`
-- `currentStatus`
-- `location`
-- `occurredAt`
-- `estimatedDeliveryDate`
-- `exceptionCode`
-
-O `OrderService` consome `shipment.status.updated` esperando:
-
-- `orderId`
-- `shipmentId`
-- `status`
-- `updatedAt`
-
-O `NotificationService` consome `shipment.status.updated` esperando:
-
-- `shipmentId`
-- `buyerId`
-- `trackingCode`
-- `currentStatus`
-- `estimatedDeliveryDate`
-- `exceptionCode`
-
-Problemas:
-
-- O payload publicado pelo `TrackingService` não tem `orderId`.
-- O payload publicado pelo `TrackingService` não tem `buyerId`.
-- O `OrderService` espera `status`, mas o producer publica `currentStatus`.
-- O `OrderService` espera `updatedAt`, mas o producer publica `occurredAt`.
-
-Impacto:
-
-- `OrderService` não consegue atualizar o pedido corretamente.
-- `NotificationService` não consegue identificar o comprador para notificação.
-
-Correção recomendada:
-
-- Propagar `orderId` e `buyerId` desde `shipment.created` para o `TrackingService`.
-- Padronizar `shipment.status.updated` com `orderId`, `buyerId`, `shipmentId`, `trackingCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate` e `exceptionCode`.
+- `order.created` contém dados logísticos suficientes para o `ShipmentService`.
+- `shipment.created` propaga `orderId` e `buyerId`.
+- `shipment.status.updated` propaga `orderId` e `buyerId`.
+- `OrderService` atualiza status de entrega do pedido.
+- `NotificationService` planeja comunicação usando `buyerId`.
 
 ## Pontos positivos
 
-- Os tópicos canônicos estão convergindo para a arquitetura:
+- Os tópicos canônicos convergiram para o contrato de arquitetura:
   - `checkout.shipping.quote.requested`
   - `shipping.promise.calculated`
   - `order.created`
@@ -212,40 +196,44 @@ Correção recomendada:
   - `shipment.status.updated`
 - As integrações usam envelope Kafka com `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `correlationId`, `producer` e `payload`.
 - Os serviços usam `localhost:9092` para desenvolvimento local.
-- Foi corrigido o commit de offset no `TrackingService`.
+- `ShippingPromiseService` passou a consumir `checkout.shipping.quote.requested`.
+- `shipping.promise.calculated` passou a carregar `checkoutId`.
+- `order.created` foi enriquecido para atender o `ShipmentService`.
+- `shipment.created` e `shipment.status.updated` passaram a propagar `orderId` e `buyerId`.
 - O `OrderService` teve seus tópicos internos de saga formalizados por ADR.
 
-## Bloqueios atuais
+## Bloqueios remanescentes
 
-| Severidade | Bloqueio | Impacto |
-|---|---|---|
-| Alta | `order.created` produzido pelo `OrderService` não atende o contrato esperado pelo `ShipmentService` | Quebra criação de shipment no E2E |
-| Alta | `shipment.status.updated` produzido pelo `TrackingService` não atende `OrderService` e `NotificationService` | Quebra atualização de pedido e notificação |
-| Alta | `shipping.promise.calculated` não contém `checkoutId` | Quebra projeção no `CheckoutService` |
-| Média | `ShippingPromiseService` não consome `checkout.shipping.quote.requested` | Fluxo quote/promise ainda não é assíncrono completo |
-| Média | `CheckoutService` consome promise apenas no modo DB-backed | Em mock mode, o fluxo Kafka de retorno não fecha |
-| Média | Serviços ainda dependem de DB/Inbox/Outbox reais | E2E local exige schema aplicado |
+| Severidade | Bloqueio | Impacto | Status |
+|---|---|---|---|
+| Média | Executar `dotnet restore`, `dotnet build`, `dotnet test` em todos os microservices | Confirma compatibilidade de compilação/testes | Pendente de ambiente local/CI |
+| Média | Aplicar schemas locais de Postgres quando serviços exigirem Outbox/Inbox reais | Necessário para E2E real com persistência | Pendente de ambiente local |
+| Baixa | Validar execução Docker/Kafka completa | Confirma runbook em máquina local | Pendente de execução local |
 
-## Decisão recomendada
+## Comandos Docker/Kafka revisados
 
-Antes de rodar E2E local completo, alinhar contratos canônicos no `kafka-events.md` e depois ajustar os producers/consumers.
+Os comandos do runbook foram revisados estaticamente:
 
-Ordem sugerida:
+```bash
+docker compose up -d
+docker compose ps
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
+docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker compose down -v
+```
 
-1. Definir contrato canônico final no `kafka-events.md`.
-2. Corrigir `ShippingPromiseService` para incluir `checkoutId` em `shipping.promise.calculated`.
-3. Corrigir o fluxo `OrderService -> ShipmentService` decidindo entre:
-   - enriquecer `order.created`; ou
-   - trocar criação de shipment para comando interno `shipment.commands`; ou
-   - criar `shipment.requested`.
-4. Corrigir `shipment.created` para carregar `orderId` e `buyerId` até o `TrackingService`.
-5. Corrigir `shipment.status.updated` para incluir `orderId`, `buyerId`, `currentStatus` e `statusDate`.
-6. Atualizar runbook e payloads de exemplo.
-7. Executar `dotnet restore`, `dotnet build`, `dotnet test` em todos os microservices.
-8. Executar E2E com Kafka local.
+Observação: a revisão confirma consistência de comandos e nomes de containers/tópicos com o `docker-compose.yml`. A execução deve ser feita em ambiente local ou CI.
 
 ## Parecer final
 
-As modificações nos microservices estão bem encaminhadas em infraestrutura Kafka, mas ainda não fecham o E2E porque cada serviço criou seu próprio payload local.
+As correções de contrato Kafka foram refletidas na documentação de arquitetura.
 
-O próximo passo não é mexer em Docker ou Kafka. É **contrato compartilhado**.
+O próximo passo é executar a validação local por fases descrita no runbook:
+
+1. subir infraestrutura;
+2. criar tópicos;
+3. executar smoke test por tópico;
+4. executar promise assíncrona;
+5. executar pedido/shipment/tracking/notification;
+6. executar E2E integrado;
+7. rodar build/test em todos os microservices.
