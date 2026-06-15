@@ -27,6 +27,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Remove stale generated SVGs
+        run: |
+          find docs/c4 docs/sequence-diagrams -type f -name '*.svg' -delete
+
       - name: Render C4-PlantUML and sequence diagrams as SVG
         run: |
           docker run --rm \
@@ -43,10 +47,10 @@ jobs:
       - name: Fail PR when generated SVGs are out of date
         if: github.event_name == 'pull_request'
         run: |
-          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
+          git add -A docs/c4 docs/sequence-diagrams
 
           if ! git diff --cached --quiet -- docs/c4 docs/sequence-diagrams; then
-            echo "Generated SVG files are out of date. Run the PlantUML render command locally and commit the changes."
+            echo "Generated SVG files are out of date. Run the PlantUML render workflow or render locally and commit the changes."
             git diff --cached -- docs/c4 docs/sequence-diagrams
             exit 1
           fi
@@ -54,7 +58,7 @@ jobs:
       - name: Commit generated SVGs
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          git add docs/c4/*.svg docs/sequence-diagrams/*.svg
+          git add -A docs/c4 docs/sequence-diagrams
 
           if git diff --cached --quiet -- docs/c4 docs/sequence-diagrams; then
             echo "No generated diagram changes to commit."
