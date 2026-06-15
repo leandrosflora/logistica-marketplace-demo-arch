@@ -1,4 +1,4 @@
-# Meli Envios Architecture
+# Use Case Logistica de Envios Architecture
 
 Repositório de arquitetura para estudo do case **Meli Envios**.
 
