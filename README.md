@@ -127,7 +127,7 @@ OrderService
 
 - [`docs/contracts/README.md`](docs/contracts/README.md)
 - [`docs/contracts/services-map.md`](docs/contracts/services-map.md)
-- [`docs/contracts/meli-envios-apis.openapi.yaml`](docs/contracts/meli-envios-apis.openapi.yaml)
+- [`docs/contracts/logistica-envios-apis.openapi.yaml`](docs/contracts/logistica-envios-apis.openapi.yaml)
 - [`docs/contracts/api-contract-validation.md`](docs/contracts/api-contract-validation.md)
 - [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md)
 
@@ -135,10 +135,10 @@ OrderService
 
 ### C4
 
-- Fonte: [`docs/c4/meli-envios-context.puml`](docs/c4/meli-envios-context.puml)
-- Imagem: [`docs/c4/meli-envios-context.svg`](docs/c4/meli-envios-context.svg)
-- Fonte: [`docs/c4/meli-envios-container.puml`](docs/c4/meli-envios-container.puml)
-- Imagem: [`docs/c4/meli-envios-container.svg`](docs/c4/meli-envios-container.svg)
+- Fonte: [`docs/c4/logistica-envios-context.puml`](docs/c4/logistica-envios-context.puml)
+- Imagem: [`docs/c4/logistica-envios-context.svg`](docs/c4/logistica-envios-context.svg)
+- Fonte: [`docs/c4/logistica-envios-container.puml`](docs/c4/logistica-envios-container.puml)
+- Imagem: [`docs/c4/logistica-envios-container.svg`](docs/c4/logistica-envios-container.svg)
 
 ### Sequence diagrams
 
@@ -174,35 +174,35 @@ docker compose ps
 ### Criar tópicos canônicos
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
 ```
 
 ### Criar tópicos internos de saga
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
 ```
 
 ### Listar tópicos
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
 ### Kafka UI
@@ -216,7 +216,7 @@ http://localhost:8088
 ### Validar OpenAPI/YAML
 
 ```bash
-docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/meli-envios-apis.openapi.yaml
+docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/logistica-envios-apis.openapi.yaml
 ```
 
 ### Validar PlantUML
