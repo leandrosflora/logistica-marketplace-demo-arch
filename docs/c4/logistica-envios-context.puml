@@ -1,0 +1,22 @@
+@startuml
+' Rendered by .github/workflows/render-diagrams.yml using C4-PlantUML.
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Logística Envios - C4 Nível 1 - Contexto
+
+Person(buyer, "Comprador", "Usuário que pesquisa produtos, calcula frete e compra.")
+Person(seller, "Seller", "Vendedor que oferta produtos.")
+System(marketplace, "Marketplace", "Canal web/app para compra.")
+System(logisticaEnvios, "Logística Envios Platform", "Plataforma de promessa, preço, rota, shipment e tracking.")
+System_Ext(carriers, "Transportadoras", "Correios, parceiros e malha logística externa.")
+System_Ext(payment, "Payment Platform", "Confirmação de pagamento.")
+System_Ext(notification, "Notification Providers", "Push, e-mail, WhatsApp/SMS.")
+
+Rel(buyer, marketplace, "Pesquisa e compra produtos")
+Rel(seller, marketplace, "Publica ofertas")
+Rel(marketplace, logisticaEnvios, "Consulta frete, prazo e cria entrega")
+Rel(logisticaEnvios, carriers, "Cota, etiqueta e rastreia")
+Rel(marketplace, payment, "Confirma pagamento")
+Rel(logisticaEnvios, notification, "Solicita notificações")
+
+@enduml
