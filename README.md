@@ -20,7 +20,7 @@ docker compose up -d
 ## Estrutura
 
 ```text
-meli-envios-architecture
+logistica-envios-architecture
 ├── docs/
 │   ├── adr/
 │   ├── c4/
