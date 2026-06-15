@@ -1,6 +1,6 @@
 # Use Case Logistica de Envios Architecture
 
-Repositório de arquitetura para estudo do case **Meli Envios**.
+Repositório de arquitetura para estudo do case **Logistisca de Envios**.
 
 Objetivo: dar contexto suficiente para o Codex entender o domínio, os microservices, os contratos, os eventos Kafka, os diagramas C4, as decisões arquiteturais e os comandos de validação local.
 
