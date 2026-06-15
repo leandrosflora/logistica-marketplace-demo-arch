@@ -242,3 +242,12 @@ Para correções de Kafka E2E, use também:
 ```text
 Respeite o contrato canônico em docs/contracts/kafka-events.md e valide o fluxo local com docs/runbooks/kafka-local-e2e.md.
 ```
+
+## DevOps
+
+Documentacao de CI/CD, qualidade, seguranca e observabilidade do projeto:
+- docs/devops/ci-cd.md
+- docs/devops/security.md
+- docs/devops/observability.md
+- docs/devops/environments.md
+- docs/devops/deployment.md
