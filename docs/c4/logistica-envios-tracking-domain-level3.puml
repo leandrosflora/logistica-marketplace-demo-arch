@@ -1,0 +1,54 @@
+@startuml
+' C4 Nível 3 - domínio Tracking
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logística Envios - C4 Nível 3 - Domínio Tracking e Kafka
+caption Foco na criação da projeção de rastreio e na publicação de shipment.status.updated.
+
+System_Ext(carrier, "Transportadora / Carrier", "Envia eventos de rastreio")
+Person(buyer, "Comprador", "Recebe atualização de entrega")
+
+System_Boundary(platform, "Logística Envios Platform") {
+  Component(kafka, "Kafka Cluster", "Kafka", "Backbone assíncrono de eventos")
+  Component(shipmentCreatedTopic, "Topic: shipment.created", "Kafka Topic", "Shipment criado pelo domínio de expedição")
+  Component(statusUpdatedTopic, "Topic: shipment.status.updated", "Kafka Topic", "Status consolidado de rastreio")
+
+  Component(shipment, "Shipment Service", ".NET 8", "Publica shipment criado")
+  Component(tracking, "Tracking Service", ".NET 8", "Mantém projeção de tracking e histórico de eventos")
+  Component(trackingDb, "Tracking DB", "Database", "Persiste status atual e linha do tempo")
+  Component(notification, "Notification Service", ".NET 8", "Notifica comprador sobre alteração de status")
+  Component(order, "Order Service", ".NET 8", "Atualiza visão do pedido conforme status logístico")
+  Component(audit, "Audit Service", "Event Consumer", "Registra trilha de auditoria")
+}
+
+Rel(shipment, kafka, "Publica", "Kafka producer")
+Rel(kafka, shipmentCreatedTopic, "Armazena", "topic")
+Rel(shipmentCreatedTopic, tracking, "Consome shipment.created", "Kafka consumer")
+Rel(tracking, trackingDb, "Cria projeção inicial de tracking", "SQL/NoSQL")
+Rel(carrier, tracking, "Webhook/evento de transporte", "HTTP/JSON")
+Rel(tracking, trackingDb, "Atualiza status e histórico", "SQL/NoSQL")
+Rel(tracking, kafka, "Publica", "Kafka producer")
+Rel(kafka, statusUpdatedTopic, "Armazena", "topic")
+Rel(statusUpdatedTopic, notification, "Consome", "Kafka consumer")
+Rel(statusUpdatedTopic, order, "Consome", "Kafka consumer")
+Rel(statusUpdatedTopic, audit, "Consome", "Kafka consumer")
+Rel(notification, buyer, "Envia atualização", "Push/e-mail/SMS")
+
+note right of tracking
+Tracking Service é o dono da projeção logística:
+- consome shipment.created
+- recebe eventos da transportadora
+- consolida status atual
+- publica shipment.status.updated
+end note
+
+note bottom of statusUpdatedTopic
+Contrato documentado em:
+docs/contracts/kafka-events.md
+- Publicado por: tracking-service
+- Consumido por: notification-service, audit-service, order-service
+end note
+
+@enduml
