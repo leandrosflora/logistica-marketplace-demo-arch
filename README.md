@@ -1,8 +1,12 @@
-# Use Case Logistica de Envios Architecture
+# Logística Envios Demo Architecture
 
-Repositório de arquitetura para estudo do case **Logistisca de Envios**.
+Repositório de arquitetura para estudo do case **Logística de Envios** (versão demo).
 
 Objetivo: dar contexto suficiente para o Codex entender o domínio, os microservices, os contratos, os eventos Kafka, os diagramas C4, as decisões arquiteturais e os comandos de validação local.
+
+## Licença
+
+Este repositório e todos os seus conteúdos são proprietários e confidenciais (All Rights Reserved). Nenhuma parte deste repositório pode ser copiada, reproduzida, transmitida ou utilizada sem permissão expressa do proprietário.
 
 ## Estado atual
 
@@ -20,7 +24,7 @@ docker compose up -d
 ## Estrutura
 
 ```text
-logistica-envios-architecture
+logistica-envios-demo-arch
 ├── docs/
 │   ├── adr/
 │   ├── c4/
@@ -245,7 +249,7 @@ Respeite o contrato canônico em docs/contracts/kafka-events.md e valide o fluxo
 
 ## DevOps
 
-Documentacao de CI/CD, qualidade, seguranca e observabilidade do projeto:
+Documentação de CI/CD, qualidade, segurança e observabilidade do projeto:
 - docs/devops/ci-cd.md
 - docs/devops/security.md
 - docs/devops/observability.md
