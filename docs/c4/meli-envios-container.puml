@@ -5,7 +5,7 @@
 title Meli Envios - C4 Nível 2 - Containers
 
 Person(buyer, "Comprador")
-System_Boundary(platform, "Meli Envios Platform") {
+System_Boundary(platform, "Envios Platform") {
   Container(bff, "Marketplace BFF", ".NET 8", "Agrega dados para o frontend.")
   Container(productSearch, "Product Search Service", ".NET 8", "Busca produtos ofertados por texto livre.")
   Container(checkout, "Checkout Service", ".NET 8", "Orquestra checkout e cotação.")
