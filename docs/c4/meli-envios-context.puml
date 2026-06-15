@@ -7,7 +7,7 @@ title Meli Envios - C4 Nível 1 - Contexto
 Person(buyer, "Comprador", "Usuário que pesquisa produtos, calcula frete e compra.")
 Person(seller, "Seller", "Vendedor que oferta produtos.")
 System(marketplace, "Marketplace", "Canal web/app para compra.")
-System(meliEnvios, "Meli Envios Platform", "Plataforma de promessa, preço, rota, shipment e tracking.")
+System(meliEnvios, "Envios Platform", "Plataforma de promessa, preço, rota, shipment e tracking.")
 System_Ext(carriers, "Transportadoras", "Correios, parceiros e malha logística externa.")
 System_Ext(payment, "Payment Platform", "Confirmação de pagamento.")
 System_Ext(notification, "Notification Providers", "Push, e-mail, WhatsApp/SMS.")
