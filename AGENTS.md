@@ -4,7 +4,7 @@ Instruções para agentes de IA e Codex ao operar neste repositório.
 
 ## Papel do repositório
 
-Este repositório é a fonte de contexto arquitetural do case **Meli Envios**. Ele não é o código-fonte dos microservices. Ele define:
+Este repositório é a fonte de contexto arquitetural do case **Logística Envios**. Ele não é o código-fonte dos microservices. Ele define:
 
 - mapa dos microservices;
 - responsabilidades;
@@ -77,37 +77,3 @@ Formato:
 ```text
 <domain>.<entity>.<event>
 ```
-
-Exemplos:
-
-```text
-shipping.promise.calculated
-shipment.status.updated
-order.created
-```
-
-### Eventos
-
-Todo evento deve conter:
-
-- `eventId`
-- `eventType`
-- `occurredAt`
-- `correlationId`
-- `producer`
-- `payload`
-- `schemaVersion`
-
-### APIs
-
-Toda API deve aceitar ou propagar:
-
-- `x-correlation-id`
-- `x-idempotency-key` quando for comando;
-- `x-client-id` quando houver BFF/canal consumidor.
-
-## Fora de escopo
-
-- Implementar UI.
-- Implementar microservices completos neste repositório.
-- Armazenar segredos, tokens, credenciais ou dados reais.
