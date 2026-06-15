@@ -24,6 +24,7 @@ Todos os eventos canônicos Kafka devem usar o envelope abaixo:
 4. `payload` deve conter todos os campos necessários para os consumers declarados.
 5. Eventos canônicos representam fatos de negócio já ocorridos.
 6. Comandos internos de saga não devem ser tratados como eventos canônicos.
+7. Os nomes dos campos do payload devem ser serializados em `camelCase`.
 
 ## Tópicos canônicos
 
@@ -33,7 +34,7 @@ Publicado por: `checkout-service`
 
 Consumido por: `shipping-promise-service`, `audit-service`, `analytics`
 
-Payload canônico esperado:
+Payload canônico:
 
 ```json
 {
@@ -57,7 +58,7 @@ Payload canônico esperado:
 }
 ```
 
-Observação: o `checkoutId` deve ser propagado no fluxo de promise para permitir que o `CheckoutService` associe a resposta assíncrona ao checkout original.
+`checkoutId` deve ser propagado no fluxo de promise para permitir que o `CheckoutService` associe a resposta assíncrona ao checkout original.
 
 ### `shipping.promise.calculated`
 
@@ -65,7 +66,7 @@ Publicado por: `shipping-promise-service`
 
 Consumido por: `checkout-service`, `audit-service`, `analytics`
 
-Payload canônico esperado:
+Payload canônico:
 
 ```json
 {
@@ -82,7 +83,7 @@ Payload canônico esperado:
 }
 ```
 
-Observação: `checkoutId` é obrigatório para o consumer do `CheckoutService`.
+`checkoutId` é obrigatório para o consumer do `CheckoutService`.
 
 ### `order.created`
 
@@ -90,7 +91,7 @@ Publicado por: `order-service`
 
 Consumido por: `shipment-service`, `notification-service`, `audit-service`
 
-Payload canônico esperado para o E2E atual:
+Payload canônico:
 
 ```json
 {
@@ -133,7 +134,7 @@ Payload canônico esperado para o E2E atual:
 }
 ```
 
-Observação: se a arquitetura optar por manter `order.created` como evento limpo de domínio, a criação de shipment deve migrar para um comando interno, como `shipment.commands`, ou para um evento mais específico, como `shipment.requested`.
+Esse contrato está enriquecido para permitir que o `ShipmentService` crie a entrega no E2E local sem lookup adicional obrigatório.
 
 ### `shipment.created`
 
@@ -141,7 +142,7 @@ Publicado por: `shipment-service`
 
 Consumido por: `tracking-service`, `notification-service`, `audit-service`
 
-Payload canônico esperado:
+Payload canônico:
 
 ```json
 {
@@ -158,7 +159,7 @@ Payload canônico esperado:
 }
 ```
 
-Observação: `orderId` e `buyerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório.
+`orderId` e `buyerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório.
 
 ### `shipment.status.updated`
 
@@ -166,7 +167,7 @@ Publicado por: `tracking-service`
 
 Consumido por: `notification-service`, `audit-service`, `order-service`
 
-Payload canônico esperado:
+Payload canônico:
 
 ```json
 {
@@ -183,7 +184,17 @@ Payload canônico esperado:
 }
 ```
 
-Observação: `orderId` é obrigatório para atualização do pedido no `OrderService`; `buyerId` é obrigatório para planejamento de notificação no `NotificationService`.
+`orderId` é obrigatório para atualização do pedido no `OrderService`; `buyerId` é obrigatório para planejamento de notificação no `NotificationService`.
+
+## Matriz final dos contratos canônicos
+
+| Tópico | Producer | Consumers | Payload obrigatório | Status |
+|---|---|---|---|---|
+| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
+| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
+| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
+| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
 
 ## Tópicos internos de saga — OrderService
 
