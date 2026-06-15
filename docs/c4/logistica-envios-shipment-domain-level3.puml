@@ -1,0 +1,53 @@
+@startuml
+' C4 Nível 3 - domínio Shipment
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logística Envios - C4 Nível 3 - Domínio Shipment e Kafka
+caption Foco na criação da entrega física a partir de order.created e na publicação de shipment.created.
+
+System_Ext(carrier, "Transportadora / Carrier", "Operador logístico externo")
+
+System_Boundary(platform, "Logística Envios Platform") {
+  Component(kafka, "Kafka Cluster", "Kafka", "Backbone assíncrono de eventos")
+  Component(orderCreatedTopic, "Topic: order.created", "Kafka Topic", "Evento publicado pelo Order Service")
+  Component(shipmentCreatedTopic, "Topic: shipment.created", "Kafka Topic", "Evento publicado pelo Shipment Service")
+
+  Component(order, "Order Service", ".NET 8", "Publica pedido criado")
+  Component(shipment, "Shipment Service", ".NET 8", "Cria shipment, pacote, etiqueta e tracking code")
+  Component(shipmentDb, "Shipment DB", "Database", "Persiste remessa, volumes e etiqueta")
+  Component(tracking, "Tracking Service", ".NET 8", "Consome shipment criado para iniciar rastreio")
+  Component(notification, "Notification Service", ".NET 8", "Consome shipment criado para notificar comprador/seller")
+  Component(audit, "Audit Service", "Event Consumer", "Consome eventos para auditoria")
+}
+
+Rel(order, kafka, "Publica", "Kafka producer")
+Rel(kafka, orderCreatedTopic, "Armazena", "topic")
+Rel(orderCreatedTopic, shipment, "Consome order.created", "Kafka consumer")
+Rel(shipment, shipmentDb, "Persiste shipment, pacote e etiqueta", "SQL/NoSQL")
+Rel(shipment, carrier, "Solicita booking/etiqueta", "HTTP/API externa")
+Rel(carrier, shipment, "Retorna tracking code e label", "HTTP/JSON")
+Rel(shipment, kafka, "Publica", "Kafka producer")
+Rel(kafka, shipmentCreatedTopic, "Armazena", "topic")
+Rel(shipmentCreatedTopic, tracking, "Consome", "Kafka consumer")
+Rel(shipmentCreatedTopic, notification, "Consome", "Kafka consumer")
+Rel(shipmentCreatedTopic, audit, "Consome", "Kafka consumer")
+
+note right of shipment
+Shipment Service é o dono do ciclo físico da entrega:
+- cria shipment
+- cria volume/pacote
+- gera etiqueta
+- obtém tracking code
+- publica shipment.created
+end note
+
+note bottom of shipmentCreatedTopic
+Contrato documentado em:
+docs/contracts/kafka-events.md
+- Publicado por: shipment-service
+- Consumido por: tracking-service, notification-service, audit-service
+end note
+
+@enduml
