@@ -59,8 +59,8 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_DB: logistica_envios_test
-          POSTGRES_USER: meli
-          POSTGRES_PASSWORD: meli
+          POSTGRES_USER: logistica
+          POSTGRES_PASSWORD: logistica
         ports:
           - 5432:5432
         options: >-
