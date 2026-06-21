@@ -55,6 +55,8 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
 
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.confirmed --partitions 1 --replication-factor 1
+
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
@@ -88,9 +90,9 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 
 | Serviço | Producer | Consumer | Consumer group | Status |
 |---|---|---|---|---|
-| `CheckoutService` | `checkout.shipping.quote.requested` | `shipping.promise.calculated` | `checkout-service` | Alinhado |
+| `CheckoutService` | `checkout.shipping.quote.requested`, `checkout.confirmed` | `shipping.promise.calculated` | `checkout-service` | Alinhado |
 | `ShippingPromiseService` | `shipping.promise.calculated` | `checkout.shipping.quote.requested` | `shipping-promise-service` | Alinhado |
-| `OrderService` | `order.created` e tópicos internos de saga | `shipment.status.updated` | `order-service` | Alinhado |
+| `OrderService` | `order.created` e tópicos internos de saga | `checkout.confirmed`, `shipment.status.updated` | `order-service` | Alinhado |
 | `ShipmentService` | `shipment.created` | `order.created` | `shipment-service` | Alinhado |
 | `TrackingService` | `shipment.status.updated` | `shipment.created` | `tracking-service` | Alinhado |
 | `NotificationService` | - | `order.created`, `shipment.created`, `shipment.status.updated` | `notification-service` | Alinhado |
@@ -101,8 +103,9 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 |---|---|---|---|---|
 | `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
 | `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
+| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `items[]`, `totalAmount`, `currency`, `confirmedAt` | Alinhado |
 | `order.created` | `order-service` | `shipment-service`, `notification-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
-| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service` | `shipmentId`, `orderId`, `buyerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
 | `shipment.status.updated` | `tracking-service` | `order-service`, `notification-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
 
 ## Ordem recomendada para teste por fases
@@ -123,6 +126,7 @@ Antes do E2E entre serviços, validar produção/consumo manual dos tópicos:
 ```text
 checkout.shipping.quote.requested
 shipping.promise.calculated
+checkout.confirmed
 order.created
 shipment.created
 shipment.status.updated
@@ -165,7 +169,29 @@ Objetivo esperado:
 3. `ShippingPromiseService` publica `shipping.promise.calculated` com o mesmo `checkoutId`.
 4. `CheckoutService` consome `shipping.promise.calculated` e grava/projeta a promise.
 
-### Fase 3 - Pedido, shipment, tracking e notification
+### Fase 3 - Confirmação de checkout e criação de pedido
+
+Rodar serviços:
+
+```text
+CheckoutService
+OrderService
+```
+
+Tópicos usados:
+
+```text
+checkout.confirmed
+order.created
+```
+
+Objetivo esperado:
+
+1. `CheckoutService` confirma o checkout e publica `checkout.confirmed`.
+2. `OrderService` consome `checkout.confirmed` e inicia a saga do pedido.
+3. `OrderService` publica `order.created` com dados logísticos suficientes para criação da entrega.
+
+### Fase 4 - Pedido, shipment, tracking e notification
 
 Rodar serviços:
 
@@ -192,7 +218,7 @@ Objetivo esperado:
 4. `NotificationService` consome `order.created`, `shipment.created` e `shipment.status.updated`.
 5. `OrderService` consome `shipment.status.updated` e atualiza status de entrega no pedido.
 
-### Fase 4 - E2E integrado
+### Fase 5 - E2E integrado
 
 Rodar serviços:
 
@@ -209,11 +235,12 @@ Objetivo:
 
 1. Criar checkout.
 2. Calcular promise assíncrona.
-3. Confirmar pedido.
-4. Criar shipment.
-5. Criar tracking/status inicial.
-6. Planejar notificações.
-7. Validar mensagens no Kafka UI.
+3. Confirmar checkout.
+4. Criar pedido.
+5. Criar shipment.
+6. Criar tracking/status inicial.
+7. Planejar notificações.
+8. Validar mensagens no Kafka UI.
 
 ## Configuração esperada em appsettings.Development.json
 
@@ -244,7 +271,7 @@ dotnet test
 
 1. Alguns serviços ainda podem exigir `DbContext`, `Inbox` e `Outbox` reais mesmo com repository mock habilitado.
 2. Para E2E real, aplique os schemas locais ou use mocks transacionais para Inbox/Outbox quando implementados.
-3. O `OrderService` possui tópicos internos de saga documentados pela ADR-0001.
+3. O `OrderService` possui tópicos internos de saga documentados pela ADR-0007.
 4. Os comandos Docker/Kafka deste runbook foram revisados estaticamente; a execução final deve ser feita localmente ou em CI.
 
 ## Validação visual
