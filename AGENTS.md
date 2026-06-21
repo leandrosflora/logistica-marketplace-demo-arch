@@ -7,12 +7,15 @@ Instruções para agentes de IA e Codex ao operar neste repositório.
 Este repositório é a fonte de contexto arquitetural do case **Logística Envios**. Ele não é o código-fonte dos microservices. Ele define:
 
 - mapa dos microservices;
-- responsabilidades;
+- responsabilidades e specs individuais por serviço;
 - contratos REST;
-- eventos Kafka;
+- eventos Kafka e schema governance;
 - diagramas C4;
-- decisões arquiteturais;
+- decisões arquiteturais (ADRs);
+- glossário de domínio;
+- documentação de segurança;
 - padrões de implementação;
+- pipeline CI/CD esperado;
 - comandos de validação local.
 
 ## Regras para o Codex
@@ -22,11 +25,15 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
    - `docs/contracts/services-map.md`
    - `docs/contracts/kafka-events.md`
    - `docs/adr/*.md`
+   - `docs/glossary/domain-glossary.md` — termos do domínio de logística e envios
+   - `docs/security/security-architecture.md` — autenticação, autorização e propagação de identidade
+   - `docs/services/<nome>-service.md` — spec do serviço sendo implementado (boundaries, dados, APIs, SLOs, regras de negócio)
 
 2. Não alterar contratos sem atualizar:
    - documentação do serviço afetado;
    - evento Kafka relacionado, se existir;
-   - ADR, se houver mudança arquitetural relevante.
+   - ADR, se houver mudança arquitetural relevante;
+   - `docs/contracts/kafka-schema-governance.md` ao evoluir schemas Kafka (leia antes de implementar consumers ou producers Kafka).
 
 3. Não criar microservice novo sem justificar:
    - responsabilidade;
@@ -44,13 +51,18 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
    - Docker para execução local.
 
 5. Padrões obrigatórios:
-   - idempotência em comandos críticos;
-   - correlationId em APIs e eventos;
-   - observabilidade com logs estruturados, métricas e traces;
+   - idempotência em comandos críticos (Inbox/Outbox Pattern — ver [ADR-0005](docs/adr/0005-idempotency-strategy.md));
+   - correlationId em APIs e eventos (ver [docs/security/security-architecture.md](docs/security/security-architecture.md));
+   - observabilidade com logs estruturados, métricas e traces via OpenTelemetry (ver [ADR-0006](docs/adr/0006-observability-stack.md));
    - fallback para dependências externas;
    - timeout explícito;
    - retry com backoff apenas em chamadas idempotentes;
-   - circuit breaker em integrações instáveis.
+   - circuit breaker em integrações instáveis;
+   - arquitetura hexagonal/clean obrigatória (ver [ADR-0003](docs/adr/0003-hexagonal-clean-architecture.md)).
+
+6. Ao criar novo microservice, criar spec correspondente em `docs/services/<nome>-service.md` seguindo o template dos serviços existentes.
+
+7. Ao evoluir schemas Kafka, seguir processo em `docs/contracts/kafka-schema-governance.md` (leia antes de implementar qualquer producer ou consumer Kafka).
 
 ## Comandos de validação esperados
 

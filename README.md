@@ -26,13 +26,18 @@ docker compose up -d
 ```text
 logistica-envios-demo-arch
 ├── docs/
-│   ├── adr/
-│   ├── c4/
-│   ├── contracts/
-│   ├── prompts/
-│   ├── reviews/
-│   ├── runbooks/
-│   └── sequence-diagrams/
+│   ├── adr/                    # Decisões arquiteturais
+│   ├── c4/                     # Diagramas C4 (PlantUML + SVG)
+│   ├── cicd/                   # Pipeline CI/CD
+│   ├── contracts/              # Contratos REST, Kafka e schema governance
+│   ├── glossary/               # Glossário de domínio
+│   ├── prompts/                # Prompts para Codex
+│   ├── reviews/                # Reviews de contratos e PRs
+│   ├── runbooks/               # Runbooks de operação local
+│   ├── security/               # Arquitetura de segurança
+│   ├── sequence-diagrams/      # Diagramas de sequência
+│   └── services/               # Specs individuais de microservice
+├── monitoring/                 # Configuração de observabilidade (Prometheus, Grafana)
 ├── docker-compose.yml
 ├── README.md
 └── AGENTS.md
@@ -68,6 +73,27 @@ Este case modela uma plataforma de cálculo de frete, promessa de entrega, dispo
 | Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria a entrega física, etiqueta, volume, pacote e despacho. |
 | Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Atualiza status de entrega, eventos de transporte e rastreio. |
 | Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Notifica comprador e seller sobre alterações relevantes. |
+
+## Specs de serviços
+
+Documentação detalhada por microservice em [`docs/services/`](docs/services/).
+
+| Serviço | Responsabilidade | Spec |
+|---|---|---|
+| Checkout Service | Orquestra a experiência de compra e chama a cotação de envio. | [spec](docs/services/checkout-service.md) |
+| Product Search Service | Busca produtos ofertados a partir de texto livre para alimentar o marketplace/BFF. | [spec](docs/services/product-search-service.md) |
+| Shipping Promise Service | Calcula prazo, disponibilidade, modalidade e promessa de entrega. | [spec](docs/services/shipping-promise-service.md) |
+| Product Catalog Service | Fornece peso, dimensão, categoria e restrições do produto. | [spec](docs/services/product-catalog-service.md) |
+| Inventory Service | Consulta estoque por SKU, seller e fulfillment center. | [spec](docs/services/inventory-service.md) |
+| Fulfillment Center Service | Informa capacidade, cutoff, operação e disponibilidade dos CDs. | [spec](docs/services/fulfillment-center-service.md) |
+| Routing Service | Calcula rotas logísticas, malha, hubs e janelas. | [spec](docs/services/routing-service.md) |
+| Carrier Service | Integra transportadoras, Correios, parceiros e restrições. | [spec](docs/services/carrier-service.md) |
+| Shipping Pricing Service | Calcula frete, custo logístico, subsídio e promoções. | [spec](docs/services/shipping-pricing-service.md) |
+| Order Service | Cria e mantém o pedido após confirmação da compra. | [spec](docs/services/order-service.md) |
+| Shipment Service | Cria a entrega física, etiqueta, volume e pacote. | [spec](docs/services/shipment-service.md) |
+| Tracking Service | Atualiza status de entrega e eventos de rastreio. | [spec](docs/services/tracking-service.md) |
+| Notification Service | Notifica comprador e seller sobre alterações relevantes. | [spec](docs/services/notification-service.md) |
+| Audit Service | Mantém rastreabilidade técnica, funcional e regulatória. | [spec](docs/services/audit-service.md) |
 
 ## Kafka E2E
 
@@ -130,6 +156,11 @@ OrderService
 - [`docs/contracts/logistica-envios-apis.openapi.yaml`](docs/contracts/logistica-envios-apis.openapi.yaml)
 - [`docs/contracts/api-contract-validation.md`](docs/contracts/api-contract-validation.md)
 - [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md)
+- [`docs/contracts/kafka-schema-governance.md`](docs/contracts/kafka-schema-governance.md)
+
+## Segurança
+
+- [`docs/security/security-architecture.md`](docs/security/security-architecture.md)
 
 ## Diagramas
 
@@ -149,13 +180,26 @@ OrderService
 
 - [`docs/adr/0001-use-event-driven-architecture.md`](docs/adr/0001-use-event-driven-architecture.md)
 - [`docs/adr/0001-order-service-internal-saga-topics.md`](docs/adr/0001-order-service-internal-saga-topics.md)
+- [`docs/adr/0002-saga-orchestrator-pattern.md`](docs/adr/0002-saga-orchestrator-pattern.md)
+- [`docs/adr/0003-hexagonal-clean-architecture.md`](docs/adr/0003-hexagonal-clean-architecture.md)
+- [`docs/adr/0004-kafka-schema-versioning.md`](docs/adr/0004-kafka-schema-versioning.md)
+- [`docs/adr/0005-idempotency-strategy.md`](docs/adr/0005-idempotency-strategy.md)
+- [`docs/adr/0006-observability-stack.md`](docs/adr/0006-observability-stack.md)
+
+## Glossário
+
+- [`docs/glossary/domain-glossary.md`](docs/glossary/domain-glossary.md)
+
+## CI/CD
+
+- [`docs/cicd/pipeline.md`](docs/cicd/pipeline.md)
 
 ## Runbooks e revisões
 
 - [`docs/runbooks/kafka-local-e2e.md`](docs/runbooks/kafka-local-e2e.md)
+- [`docs/runbooks/observability-local.md`](docs/runbooks/observability-local.md)
 - [`docs/reviews/kafka-e2e-validation-2026-06-14.md`](docs/reviews/kafka-e2e-validation-2026-06-14.md)
 - [`docs/reviews/kafka-e2e-contract-review-2026-06-14.md`](docs/reviews/kafka-e2e-contract-review-2026-06-14.md)
-- [`docs/prompts/codex-microservices-kafka-contract-fixes-2026-06-14.md`](docs/prompts/codex-microservices-kafka-contract-fixes-2026-06-14.md)
 
 ## Validação local
 
