@@ -34,10 +34,14 @@ Nenhuma.
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `GET /inventory/{skuId}/availability` | TBD (crítico: chamado no caminho de cotação) |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.95% | 21 min/mês |
+| Error rate (5xx) | < 0.05% das requisições | — |
+| Latência P99 `GET /v1/inventory/{sellerId}/{skuId}` | < 50 ms | — |
+| Latência P99 `POST /v1/inventory/availability/batch` | < 100 ms | — |
+| Latência P99 `POST /v1/inventory/reservations` | < 200 ms | — |
+| Lag de consumo `inventory.commands` (P95) | < 2 s | — |
 
 ## Regras de negócio principais
 

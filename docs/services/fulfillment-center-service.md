@@ -32,10 +32,12 @@ Nenhuma.
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `GET /fulfillment-centers/{id}/availability` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `POST /v1/fulfillment-centers/candidates/search` | < 100 ms | — |
+| Lag de consumo `fulfillment.commands` (P95) | < 2 s | — |
 
 ## Regras de negócio principais
 

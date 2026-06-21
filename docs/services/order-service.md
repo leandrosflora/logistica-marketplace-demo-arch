@@ -46,11 +46,14 @@ Tópicos internos publicados pelo `OrderProcessManager`:
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `POST /orders` | TBD |
-| Tempo médio de conclusão da saga | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `POST /v1/orders` | < 500 ms | — |
+| Latência P99 `GET /v1/orders/{id}` | < 100 ms | — |
+| Tempo P95 de conclusão da saga (`checkout.confirmed` → `order.confirmed`) | < 30 s | — |
+| Taxa de sagas concluídas com sucesso | ≥ 99.5% | — |
 
 ## Regras de negócio principais
 
