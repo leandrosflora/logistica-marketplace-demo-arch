@@ -4,12 +4,12 @@
 
 LAYOUT_WITH_LEGEND()
 
-title Meli Envios - C4 Nível 3 - Domínio Checkout e Promise Assíncrona
+title Logística Envios - C4 Nível 3 - Domínio Checkout e Promise Assíncrona
 caption Fluxo de cotação de frete assíncrona via Kafka entre CheckoutService e ShippingPromiseService.
 
 Person(buyer, "Comprador", "Inicia o processo de compra no marketplace")
 
-System_Boundary(platform, "Meli Envios Platform") {
+System_Boundary(platform, "Logística Envios Platform") {
   Component(web, "Marketplace Web", "ASP.NET Core Razor", "Canal web do marketplace")
   Component(bff, "MarketplaceWeb.Bff", ".NET 8 BFF", "API orientada à experiência web, propaga x-correlation-id e x-client-id")
 

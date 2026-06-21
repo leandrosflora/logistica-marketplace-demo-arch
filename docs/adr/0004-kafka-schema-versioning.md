@@ -10,7 +10,7 @@ Aceita
 
 ## Contexto
 
-Os eventos Kafka canônicos do ecossistema Meli Envios usam um envelope padrão com campo `schemaVersion`. Com múltiplos producers e consumers desenvolvidos independentemente, é necessária uma estratégia clara para evoluir schemas sem quebrar integrações existentes.
+Os eventos Kafka canônicos do ecossistema Logística Envios usam um envelope padrão com campo `schemaVersion`. Com múltiplos producers e consumers desenvolvidos independentemente, é necessária uma estratégia clara para evoluir schemas sem quebrar integrações existentes.
 
 Abordagens consideradas:
 

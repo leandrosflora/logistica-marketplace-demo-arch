@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Executar e validar localmente a comunicação Kafka entre os microservices do case Meli Envios.
+Executar e validar localmente a comunicação Kafka entre os microservices do case Logística Envios.
 
 ## Status atual
 
@@ -28,7 +28,7 @@ Importante: `http://localhost:8088` é apenas a interface web do Kafka UI. Micro
 
 ## Subir infraestrutura
 
-No repo `meli-envios-architecture`:
+No repo `logistica-envios-demo-arch`:
 
 ```bash
 docker compose up -d
@@ -51,15 +51,15 @@ http://localhost:8088
 Os comandos usam `--if-not-exists` para permitir reexecução segura.
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
 ```
 
 ## Criar tópicos internos de saga do OrderService
@@ -67,21 +67,21 @@ docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092
 Esses tópicos foram formalizados pela [`ADR-0001`](../adr/0001-order-service-internal-saga-topics.md).
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
 ```
 
 Listar tópicos:
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
 ## Microservices com Kafka implementado
@@ -133,13 +133,13 @@ Use `kafka-console-producer` e `kafka-console-consumer` para validar conectivida
 Exemplo de consumo:
 
 ```bash
-docker exec -it meli-envios-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic order.created --from-beginning
+docker exec -it logistica-envios-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic order.created --from-beginning
 ```
 
 Exemplo de produção manual:
 
 ```bash
-docker exec -it meli-envios-kafka kafka-console-producer --bootstrap-server localhost:9092 --topic order.created
+docker exec -it logistica-envios-kafka kafka-console-producer --bootstrap-server localhost:9092 --topic order.created
 ```
 
 ### Fase 2 - Promise assíncrona

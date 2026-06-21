@@ -1,8 +1,8 @@
-# Prompt Codex — Testes unitários dos microservices Meli Envios
+# Prompt Codex — Testes unitários dos microservices Logística Envios
 
 Use este repositório como fonte de contexto arquitetural.
 
-Objetivo: criar uma suíte mínima, consistente e executável de testes unitários para cada microservice do case **Meli Envios**, sem alterar contratos públicos sem necessidade.
+Objetivo: criar uma suíte mínima, consistente e executável de testes unitários para cada microservice do case **Logística Envios**, sem alterar contratos públicos sem necessidade.
 
 ## Contexto obrigatório
 
@@ -12,10 +12,10 @@ Antes de modificar código, leia:
 - `AGENTS.md`
 - `docs/contracts/services-map.md`
 - `docs/contracts/kafka-events.md`
-- `docs/contracts/meli-envios-apis.openapi.yaml`
+- `docs/contracts/logistica-envios-apis.openapi.yaml`
 - `docs/adr/*.md`
 
-O repositório `meli-envios-architecture` não contém o código-fonte dos microservices. Ele contém o mapa arquitetural, contratos, eventos Kafka, ADRs e comandos esperados de validação. Os testes devem ser criados nos repositórios dos microservices listados no README.
+O repositório `logistica-envios-architecture` não contém o código-fonte dos microservices. Ele contém o mapa arquitetural, contratos, eventos Kafka, ADRs e comandos esperados de validação. Os testes devem ser criados nos repositórios dos microservices listados no README.
 
 ## Microservices no escopo
 

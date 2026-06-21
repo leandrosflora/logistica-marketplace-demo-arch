@@ -2,7 +2,7 @@
 
 ## Responsabilidade
 
-Mantém a rastreabilidade técnica, funcional e regulatória de todos os eventos relevantes do ecossistema Meli Envios. É o repositório imutável de auditoria que permite reconstituir o histórico completo de qualquer pedido, entrega ou pagamento.
+Mantém a rastreabilidade técnica, funcional e regulatória de todos os eventos relevantes do ecossistema Logística Envios. É o repositório imutável de auditoria que permite reconstituir o histórico completo de qualquer pedido, entrega ou pagamento.
 
 ## Dados dominados
 

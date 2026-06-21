@@ -1,7 +1,7 @@
 services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: meli-envios-kafka
+    container_name: logistica-envios-kafka
     ports:
       - "9092:9092"
     environment:
@@ -22,7 +22,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: meli-envios-kafka-ui
+    container_name: logistica-envios-kafka-ui
     ports:
       - "8088:8080"
     depends_on:
@@ -33,17 +33,17 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: meli-envios-redis
+    container_name: logistica-envios-redis
     ports:
       - "6379:6379"
 
   postgres:
     image: postgres:16-alpine
-    container_name: meli-envios-postgres
+    container_name: logistica-envios-postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: meli_envios
+      POSTGRES_DB: logistica_envios
       POSTGRES_USER: meli
       POSTGRES_PASSWORD: meli
     volumes:
@@ -51,7 +51,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.57
-    container_name: meli-envios-jaeger
+    container_name: logistica-envios-jaeger
     ports:
       - "16686:16686"  # Jaeger UI
       - "4317:4317"    # OTLP gRPC
@@ -63,7 +63,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.51.0
-    container_name: meli-envios-prometheus
+    container_name: logistica-envios-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -76,7 +76,7 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.0
-    container_name: meli-envios-grafana
+    container_name: logistica-envios-grafana
     ports:
       - "3000:3000"
     environment:

@@ -1,10 +1,10 @@
-# Revisão de contratos Kafka E2E - Microservices Meli Envios
+# Revisão de contratos Kafka E2E - Microservices Logística Envios
 
 Data: 2026-06-14
 
 ## Escopo
 
-Validação estática das modificações Kafka recentes nos microservices e revisão de aderência ao repositório `meli-envios-architecture`.
+Validação estática das modificações Kafka recentes nos microservices e revisão de aderência ao repositório `logistica-envios-architecture`.
 
 Repos avaliados:
 
@@ -14,7 +14,7 @@ Repos avaliados:
 - `leandrosflora/ShipmentService`
 - `leandrosflora/TrackingService`
 - `leandrosflora/NotificationService`
-- `leandrosflora/meli-envios-architecture`
+- `leandrosflora/logistica-envios-architecture`
 
 Referências:
 
@@ -217,8 +217,8 @@ Os comandos do runbook foram revisados estaticamente:
 ```bash
 docker compose up -d
 docker compose ps
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 docker compose down -v
 ```
 

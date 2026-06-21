@@ -4,10 +4,10 @@
 
 LAYOUT_WITH_LEGEND()
 
-title Meli Envios - C4 Nível 3 - Domínio Shipping Promise (Cotação Síncrona)
+title Logística Envios - C4 Nível 3 - Domínio Shipping Promise (Cotação Síncrona)
 caption Foco nas dependências síncronas do ShippingPromiseService para calcular a promessa de entrega.
 
-System_Boundary(platform, "Meli Envios Platform") {
+System_Boundary(platform, "Logística Envios Platform") {
 
   Container_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
     Component(promiseController, "ShippingPromiseController", "ASP.NET Core Controller", "Expõe POST /v1/shipping-promises (fallback síncrono)")

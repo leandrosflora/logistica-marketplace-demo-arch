@@ -1,8 +1,8 @@
-# Pipeline CI/CD — Meli Envios Microservices
+# Pipeline CI/CD — Logística Envios Microservices
 
 ## Visão geral
 
-Este documento descreve o pipeline CI/CD esperado para todos os microservices do ecossistema Meli Envios implementados em .NET 8. O pipeline é executado automaticamente a cada push em branches de feature e em pull requests para `main`.
+Este documento descreve o pipeline CI/CD esperado para todos os microservices do ecossistema Logística Envios implementados em .NET 8. O pipeline é executado automaticamente a cada push em branches de feature e em pull requests para `main`.
 
 ---
 
@@ -58,7 +58,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: meli_envios_test
+          POSTGRES_DB: logistica_envios_test
           POSTGRES_USER: meli
           POSTGRES_PASSWORD: meli
         ports:
@@ -158,12 +158,12 @@ jobs:
 
 ## Validação de contratos (repositório de arquitetura)
 
-Para validar os contratos OpenAPI e os diagramas PlantUML do repositório `meli-envios-architecture`:
+Para validar os contratos OpenAPI e os diagramas PlantUML do repositório `logistica-envios-demo-arch`:
 
 ### Validar OpenAPI
 
 ```bash
-docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/meli-envios-apis.openapi.yaml
+docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/logistica-envios-apis.openapi.yaml
 ```
 
 ### Validar PlantUML (sintaxe)

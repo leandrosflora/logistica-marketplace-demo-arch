@@ -1,8 +1,8 @@
-# Arquitetura de Segurança — Meli Envios
+# Arquitetura de Segurança — Logística Envios
 
 ## Visão geral
 
-Este documento descreve a estratégia de autenticação, autorização, propagação de identidade e gestão de segredos adotada no ecossistema Meli Envios.
+Este documento descreve a estratégia de autenticação, autorização, propagação de identidade e gestão de segredos adotada no ecossistema Logística Envios.
 
 ---
 
@@ -138,7 +138,7 @@ Para desenvolvimento local, usar **User Secrets do .NET**:
 ```bash
 dotnet user-secrets init
 dotnet user-secrets set "Kafka:BootstrapServers" "localhost:9092"
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=meli_envios;Username=meli;Password=meli"
+dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=logistica_envios;Username=meli;Password=meli"
 ```
 
 Os valores do `docker-compose.yml` deste repositório (usuário `meli`, senha `meli`) são exclusivos para ambiente local e não devem ser usados em staging ou produção.

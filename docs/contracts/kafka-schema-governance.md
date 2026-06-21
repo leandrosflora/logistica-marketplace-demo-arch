@@ -1,8 +1,8 @@
-# Governança de Schemas Kafka — Meli Envios
+# Governança de Schemas Kafka — Logística Envios
 
 ## Objetivo
 
-Documentar o processo de evolução, versionamento e ownership dos schemas dos eventos Kafka canônicos do ecossistema Meli Envios.
+Documentar o processo de evolução, versionamento e ownership dos schemas dos eventos Kafka canônicos do ecossistema Logística Envios.
 
 Decisão arquitetural relacionada: [ADR-0004 — Estratégia de Versionamento de Schemas Kafka](../adr/0004-kafka-schema-versioning.md).
 

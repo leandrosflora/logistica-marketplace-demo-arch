@@ -1,14 +1,14 @@
-# Validação de contratos HTTP - Meli Envios
+# Validação de contratos HTTP - Logística Envios
 
 Data da revalidação: 2026-06-14
 
 ## Objetivo
 
-Revalidar os contratos HTTP dos repositórios envolvidos no case Meli Envios após a correção das 8 pendências apontadas na validação anterior.
+Revalidar os contratos HTTP dos repositórios envolvidos no case Logística Envios após a correção das 8 pendências apontadas na validação anterior.
 
 Arquivo OpenAPI consolidado de referência:
 
-- [`meli-envios-apis.openapi.yaml`](meli-envios-apis.openapi.yaml)
+- [`logistica-envios-apis.openapi.yaml`](logistica-envios-apis.openapi.yaml)
 
 ## Método de validação
 

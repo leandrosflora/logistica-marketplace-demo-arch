@@ -1,10 +1,10 @@
-# Validação geral dos PRs recentes - Microservices Meli Envios
+# Validação geral dos PRs recentes - Microservices Logística Envios
 
 Data: 2026-06-14
 
 ## Escopo
 
-Validação estática dos PRs recentes nos repositórios de microservices, BFF e frontend ligados ao case Meli Envios.
+Validação estática dos PRs recentes nos repositórios de microservices, BFF e frontend ligados ao case Logística Envios.
 
 Foram revisados principalmente:
 

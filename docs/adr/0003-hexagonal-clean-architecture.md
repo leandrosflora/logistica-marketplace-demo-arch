@@ -10,7 +10,7 @@ Aceita
 
 ## Contexto
 
-Os microservices do case Meli Envios são implementados em .NET 8 com C#. A escolha de padrão arquitetural interno impacta testabilidade, manutenibilidade e capacidade de trocar dependências externas (banco de dados, broker, APIs de terceiros) sem modificar a lógica de negócio.
+Os microservices do case Logística Envios são implementados em .NET 8 com C#. A escolha de padrão arquitetural interno impacta testabilidade, manutenibilidade e capacidade de trocar dependências externas (banco de dados, broker, APIs de terceiros) sem modificar a lógica de negócio.
 
 Padrões considerados:
 
