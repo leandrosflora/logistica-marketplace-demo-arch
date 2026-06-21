@@ -44,8 +44,8 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_DB: logistica_envios
-      POSTGRES_USER: meli
-      POSTGRES_PASSWORD: meli
+      POSTGRES_USER: logistica
+      POSTGRES_PASSWORD: logistica
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -80,7 +80,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: meli
+      GF_SECURITY_ADMIN_PASSWORD: logistica
       GF_SECURITY_ADMIN_USER: admin
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
