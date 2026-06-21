@@ -20,15 +20,32 @@ alt Checkout existente
   CheckoutDb --> Checkout: Checkout salvo
   Checkout --> BFF: 201 Created CheckoutResponse
 else Novo checkout
-  Checkout -> Promise: POST /shipping-promises/
-  Promise --> Checkout: Promessa disponível
-  Checkout -> CheckoutDb: Persiste checkout e itens
-  Checkout -> CheckoutDb: Registra evento de checkout criado
-  Checkout --> BFF: 201 Created CheckoutResponse
+  Checkout -> CheckoutDb: Persiste checkout em status Created
+  Checkout -> Kafka: Publica checkout.shipping.quote.requested
+  Checkout --> BFF: 201 Created CheckoutResponse (cotação pendente)
 end
 deactivate Checkout
 BFF --> FE: Checkout criado
-FE --> Comprador: Exibe resumo
+FE --> Comprador: Aguardando cotação de frete
+
+note over Kafka, Promise
+  Cotação assíncrona via Kafka
+  (fluxo detalhado em 01-product-search-and-quote-happy-path.puml)
+end note
+
+Kafka -> Promise: checkout.shipping.quote.requested
+activate Promise
+Promise --> Kafka: shipping.promise.calculated
+deactivate Promise
+Kafka -> Checkout: shipping.promise.calculated
+activate Checkout
+Checkout -> CheckoutDb: Persiste ShippingPromiseProjection
+deactivate Checkout
+FE -> BFF: GET /api/web/v1/checkouts/{checkoutId}/shipping-options
+BFF -> Checkout: GET /checkouts/{checkoutId}/shipping-options
+Checkout --> BFF: Opções de frete disponíveis
+BFF --> FE: Opções de frete
+FE --> Comprador: Exibe opções e prazo
 
 Comprador -> FE: Confirma checkout
 FE -> BFF: POST /api/web/v1/checkouts/{checkoutId}/confirm + Idempotency-Key

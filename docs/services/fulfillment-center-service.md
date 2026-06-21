@@ -45,5 +45,5 @@ Nenhuma.
 
 ## Decisões arquiteturais relacionadas
 
-- [ADR-0001 — Tópicos internos de saga](../adr/0001-order-service-internal-saga-topics.md)
+- [ADR-0007 — Tópicos internos de saga](../adr/0007-order-service-internal-saga-topics.md)
 - [ADR-0002 — Saga Orchestrator](../adr/0002-saga-orchestrator-pattern.md)

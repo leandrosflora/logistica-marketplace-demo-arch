@@ -20,7 +20,7 @@ Referências:
 
 - [`docs/contracts/kafka-events.md`](../contracts/kafka-events.md)
 - [`docs/runbooks/kafka-local-e2e.md`](../runbooks/kafka-local-e2e.md)
-- [`docs/adr/0001-order-service-internal-saga-topics.md`](../adr/0001-order-service-internal-saga-topics.md)
+- [`docs/adr/0007-order-service-internal-saga-topics.md`](../adr/0007-order-service-internal-saga-topics.md)
 
 ## Resultado executivo
 

@@ -35,9 +35,11 @@
 
 ## Fluxo assíncrono de pedido
 
-1. Order Service publica `order.created`.
-2. Shipment Service consome e cria shipment.
-3. Shipment Service publica `shipment.created`.
-4. Tracking Service acompanha eventos de atualização.
-5. Notification Service notifica comprador/seller.
-6. Audit Service persiste rastreabilidade.
+1. Checkout Service publica `checkout.confirmed` após confirmação do buyer.
+2. Order Service consome `checkout.confirmed` e inicia a saga de criação de pedido.
+3. Order Service publica `order.created` ao concluir a saga com sucesso.
+4. Shipment Service consome `order.created` e cria o shipment físico.
+5. Shipment Service publica `shipment.created`.
+6. Tracking Service acompanha eventos de atualização.
+7. Notification Service notifica comprador/seller.
+8. Audit Service persiste rastreabilidade.

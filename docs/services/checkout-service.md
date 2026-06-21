@@ -25,6 +25,7 @@ Headers obrigatórios: `x-correlation-id`, `x-idempotency-key` (em POST/confirm)
 | Tópico | Quando | Schema |
 |---|---|---|
 | `checkout.shipping.quote.requested` | Ao iniciar cotação de frete | [kafka-events.md](../contracts/kafka-events.md#checkoutshippingquoterequested) |
+| `checkout.confirmed` | Ao confirmar o checkout (`POST /confirm`) | [kafka-events.md](../contracts/kafka-events.md#checkoutconfirmed) |
 
 ## Eventos Kafka consumidos
 
