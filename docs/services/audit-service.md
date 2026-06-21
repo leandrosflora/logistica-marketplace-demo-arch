@@ -40,11 +40,12 @@ Nenhuma.
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência de persistência de entrada após consumo Kafka | TBD |
-| Latência P99 `GET /audit/entries` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.5% | 3.6 h/mês |
+| Perda de eventos de auditoria | 0% (tolerância zero) | — |
+| Lag de persistência (consumo Kafka → entrada persistida) P95 | < 5 s | — |
+| Latência P99 `GET /v1/audit/events` | < 500 ms | — |
 
 ## Regras de negócio principais
 

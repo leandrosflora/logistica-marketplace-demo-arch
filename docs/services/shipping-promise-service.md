@@ -40,11 +40,13 @@ Calcula prazo, disponibilidade, modalidade e custo de entrega para um conjunto d
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `POST /shipping-promises` | TBD (fluxo síncrono — crítico para UX) |
-| Latência de publicação após consumo Kafka | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.5% das requisições | — |
+| Latência P99 `POST /v1/shipping-promises` (fluxo síncrono) | < 800 ms | — |
+| Latência P95 `checkout.shipping.quote.requested` → publicação de `shipping.promise.calculated` | < 5 s | — |
+| Taxa de promessas com `available: true` | ≥ 85% das cotações | — |
 
 ## Regras de negócio principais
 

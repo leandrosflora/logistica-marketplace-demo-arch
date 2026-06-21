@@ -32,10 +32,12 @@ Nenhum.
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `POST /carriers/options` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.5% | 3.6 h/mês |
+| Error rate (5xx próprios — excluindo falhas de transportadora) | < 1% | — |
+| Latência P99 `POST /v1/carrier-availability/search` (com validação real-time) | < 1 s | — |
+| Taxa de respostas via cache local (sem chamada externa) | ≥ 70% | — |
 
 ## Regras de negócio principais
 

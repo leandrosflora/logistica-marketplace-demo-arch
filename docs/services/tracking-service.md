@@ -37,11 +37,13 @@ Acompanha e processa eventos de rastreio de entrega, mantém a linha do tempo de
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `GET /tracking/{trackingCode}` | TBD |
-| Latência entre recebimento de evento e publicação de `shipment.status.updated` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `GET /v1/tracking/{trackingCode}` (endpoint público) | < 100 ms | — |
+| Latência P99 `GET /v1/tracking/shipments/{id}` | < 100 ms | — |
+| Lag de processamento: recebimento de evento de carrier → publicação de `shipment.status.updated` (P95) | < 10 s | — |
 
 ## Regras de negócio principais
 

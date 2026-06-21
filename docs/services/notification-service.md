@@ -39,10 +39,12 @@ Nenhum (serviço de saída pura — não publica eventos canônicos).
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência entre consumo Kafka e envio da notificação | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.5% | 3.6 h/mês |
+| Taxa de entrega de notificações (delivery rate) | ≥ 99% | — |
+| Lag Kafka (evento recebido → notificação enfileirada) P95 | < 10 s | — |
+| Tempo até envio pelo provider (enfileirada → entregue ao provider) P95 | < 30 s | — |
 
 ## Regras de negócio principais
 

@@ -29,10 +29,12 @@ Nenhuma direta (índice local).
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `GET /products/search` | TBD (crítico para UX de busca) |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.5% | 3.6 h/mês |
+| Error rate (5xx) | < 1% das requisições | — |
+| Latência P99 `GET /v1/products/search` | < 300 ms | — |
+| Latência P50 `GET /v1/products/search` | < 80 ms | — |
 
 ## Regras de negócio principais
 

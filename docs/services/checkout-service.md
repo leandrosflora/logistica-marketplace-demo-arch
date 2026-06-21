@@ -41,11 +41,14 @@ Dependências de infraestrutura: Redis (cache de promessa), Postgres (persistên
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `POST /checkouts` | TBD |
-| Latência P99 `GET /checkouts/{id}/shipping-options` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `POST /v1/checkouts` | < 200 ms | — |
+| Latência P99 `POST /v1/checkouts/{id}/confirm` | < 300 ms | — |
+| Latência P99 `GET /v1/checkouts/{id}/shipping-options` | < 100 ms | — |
+| Lag de consumo `shipping.promise.calculated` (P95) | < 5 s desde publicação | — |
 
 ## Regras de negócio principais
 

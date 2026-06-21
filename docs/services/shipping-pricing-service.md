@@ -29,10 +29,11 @@ Nenhuma direta (regras de negócio proprietárias).
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 `POST /pricing/freight` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `POST /v1/shipping-prices/quotes/batch` | < 150 ms | — |
 
 ## Regras de negócio principais
 

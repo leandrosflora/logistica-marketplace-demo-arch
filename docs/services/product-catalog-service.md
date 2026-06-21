@@ -29,11 +29,13 @@ Nenhuma (fonte de dados proprietária).
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Latência P99 GET por SKU | TBD (crítico: chamado no caminho de cotação) |
-| Cache hit rate | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.95% | 21 min/mês |
+| Error rate (5xx) | < 0.05% das requisições | — |
+| Latência P99 `GET /v1/products/{skuId}` | < 50 ms | — |
+| Latência P99 `POST /v1/products/physical-info/batch` | < 100 ms | — |
+| Cache hit rate (Redis) | ≥ 95% | — |
 
 ## Regras de negócio principais
 

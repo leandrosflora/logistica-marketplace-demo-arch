@@ -39,10 +39,13 @@ Cria a entrega física do pedido: gera etiqueta, define volume, atribui código 
 
 ## SLOs
 
-| Métrica | Objetivo |
-|---|---|
-| Disponibilidade | TBD |
-| Tempo médio para publicar `shipment.created` após consumir `order.created` | TBD |
+| Métrica | Objetivo | Error Budget (30d) |
+|---|---|---|
+| Disponibilidade | ≥ 99.9% | 43 min/mês |
+| Error rate (5xx) | < 0.1% das requisições | — |
+| Latência P99 `GET /v1/shipments/{id}` | < 150 ms | — |
+| Tempo P95 entre consumo de `order.created` e publicação de `shipment.created` | < 60 s | — |
+| Taxa de shipments criados com sucesso | ≥ 99% | — |
 
 ## Regras de negócio principais
 
