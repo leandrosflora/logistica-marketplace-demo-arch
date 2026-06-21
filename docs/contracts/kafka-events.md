@@ -142,13 +142,14 @@ Publicado por: `shipment-service`
 
 Consumido por: `tracking-service`, `notification-service`, `audit-service`
 
-Payload canônico:
+Payload canônico (`schemaVersion: "1.1"`):
 
 ```json
 {
   "shipmentId": "uuid",
   "orderId": "uuid",
   "buyerId": "uuid",
+  "sellerId": "uuid",
   "carrierCode": "carrier_1",
   "serviceLevelCode": "same_day",
   "externalShipmentId": "ext_123",
@@ -159,7 +160,7 @@ Payload canônico:
 }
 ```
 
-`orderId` e `buyerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório.
+`orderId`, `buyerId` e `sellerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório. `sellerId` adicionado em `schemaVersion 1.1` (mudança backward-compatible).
 
 ### `shipment.status.updated`
 
@@ -186,6 +187,107 @@ Payload canônico:
 
 `orderId` é obrigatório para atualização do pedido no `OrderService`; `buyerId` é obrigatório para planejamento de notificação no `NotificationService`.
 
+## Novos eventos canônicos
+
+### `order.confirmed`
+
+Publicado por: `order-service`
+
+Consumido por: `notification-service`, `audit-service`
+
+Payload canônico (`schemaVersion: "1.0"`):
+
+```json
+{
+  "orderId": "uuid",
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "confirmedAt": "2026-06-14T12:01:00Z"
+}
+```
+
+Publicado quando o `OrderService` confirma que a saga de criação de pedido foi concluída com sucesso (estoque reservado, pagamento autorizado, shipment criado).
+
+### `order.cancelled`
+
+Publicado por: `order-service`
+
+Consumido por: `shipment-service`, `notification-service`, `audit-service`, `inventory-service`
+
+Payload canônico (`schemaVersion: "1.0"`):
+
+```json
+{
+  "orderId": "uuid",
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "cancellationReason": "payment_rejected",
+  "cancelledAt": "2026-06-14T12:05:00Z"
+}
+```
+
+`cancellationReason` pode ser: `payment_rejected`, `inventory_unavailable`, `buyer_requested`, `fulfillment_capacity_unavailable`, `shipment_failed`.
+
+### `payment.approved`
+
+Publicado por: `payment-service`
+
+Consumido por: `order-service`, `audit-service`
+
+Payload canônico (`schemaVersion: "1.0"`):
+
+```json
+{
+  "orderId": "uuid",
+  "paymentId": "uuid",
+  "amount": 129.9,
+  "currency": "BRL",
+  "paymentMethod": "credit_card",
+  "approvedAt": "2026-06-14T12:00:30Z"
+}
+```
+
+### `payment.rejected`
+
+Publicado por: `payment-service`
+
+Consumido por: `order-service`, `notification-service`, `audit-service`
+
+Payload canônico (`schemaVersion: "1.0"`):
+
+```json
+{
+  "orderId": "uuid",
+  "paymentId": "uuid",
+  "buyerId": "uuid",
+  "rejectionCode": "insufficient_funds",
+  "rejectedAt": "2026-06-14T12:00:30Z"
+}
+```
+
+`rejectionCode` pode ser: `insufficient_funds`, `card_expired`, `fraud_suspected`, `bank_refused`, `timeout`.
+
+### `shipment.cancelled`
+
+Publicado por: `shipment-service`
+
+Consumido por: `tracking-service`, `notification-service`, `order-service`, `audit-service`
+
+Payload canônico (`schemaVersion: "1.0"`):
+
+```json
+{
+  "shipmentId": "uuid",
+  "orderId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "cancellationReason": "order_cancelled",
+  "cancelledAt": "2026-06-14T12:06:00Z"
+}
+```
+
 ## Matriz final dos contratos canônicos
 
 | Tópico | Producer | Consumers | Payload obrigatório | Status |
@@ -193,8 +295,13 @@ Payload canônico:
 | `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
 | `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
 | `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
-| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
+| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `confirmedAt` | Especificado |
+| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `cancellationReason`, `cancelledAt` | Especificado |
+| `payment.approved` | `payment-service` | `order-service`, `audit-service` | `orderId`, `paymentId`, `amount`, `currency`, `paymentMethod`, `approvedAt` | Especificado |
+| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | `orderId`, `paymentId`, `buyerId`, `rejectionCode`, `rejectedAt` | Especificado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado (v1.1) |
 | `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
+| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `cancellationReason`, `cancelledAt` | Especificado |
 
 ## Tópicos internos de saga — OrderService
 

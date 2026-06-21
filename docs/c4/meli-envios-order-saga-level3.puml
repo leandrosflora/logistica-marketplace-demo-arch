@@ -1,0 +1,99 @@
+@startuml
+' C4 Nível 3 - Saga Orchestrator do OrderService
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Meli Envios - C4 Nível 3 - Saga Orchestrator (OrderService)
+caption Fluxo interno da Saga de criação de pedido orquestrada pelo OrderProcessManager no OrderService.
+
+System_Boundary(platform, "Meli Envios Platform") {
+
+  Component_Boundary(orderBound, "Order Service (.NET 8)") {
+    Component(orderController, "OrderController", "ASP.NET Core Controller", "Expõe POST /v1/orders e POST /v1/orders/{id}/cancel")
+    Component(orderApp, "OrderApplicationService", "Application Service", "Cria pedido e inicia saga via OrderProcessManager")
+    Component(orderDomain, "Order (Aggregate)", "Domain Entity", "Pedido com status, itens, endereço e promessa")
+    Component(sagaState, "OrderSagaState", "Domain Entity", "Estado persistente da saga: etapa atual, compensações pendentes")
+    Component(sagaRepo, "OrderSagaRepository", "Infrastructure", "Persistência do estado da saga em Postgres")
+    Component(orderRepo, "OrderRepository", "Infrastructure", "Persistência do pedido em Postgres")
+    Component(outbox, "OutboxDispatcher", "Infrastructure", "Publica eventos canônicos da Outbox para Kafka")
+    Component(processManager, "OrderProcessManager", "Application Service", "Orquestra etapas da saga: reserva, fulfillment, pagamento, shipment")
+    Component(sagaConsumer, "KafkaSagaResponseConsumer", "Infrastructure", "Consome respostas dos tópicos internos e eventos canônicos externos")
+  }
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Backbone assíncrono")
+
+  Component(invCmd, "Topic: inventory.commands", "Kafka Topic (Interno)", "Comando de reserva/liberação de estoque")
+  Component(fulfCmd, "Topic: fulfillment.commands", "Kafka Topic (Interno)", "Comando de validação/ativação de FC")
+  Component(payCmd, "Topic: payment.commands", "Kafka Topic (Interno)", "Comando de autorização/captura/cancelamento de pagamento")
+  Component(shpCmd, "Topic: shipment.commands", "Kafka Topic (Interno)", "Comando de criação/cancelamento de entrega")
+  Component(orderEvents, "Topic: order.events", "Kafka Topic (Interno)", "Eventos internos do ciclo de vida do pedido")
+
+  Component(orderCreated, "Topic: order.created", "Kafka Topic (Canônico)", "Pedido criado — consumido por Shipment, Notification, Audit")
+  Component(orderCancelled, "Topic: order.cancelled", "Kafka Topic (Canônico)", "Pedido cancelado — consumido por Shipment, Notification, Inventory, Audit")
+  Component(payApproved, "Topic: payment.approved", "Kafka Topic (Canônico)", "Pagamento aprovado — consumido pelo OrderService")
+  Component(payRejected, "Topic: payment.rejected", "Kafka Topic (Canônico)", "Pagamento rejeitado — inicia compensação da saga")
+
+  System_Ext(inventoryService, "Inventory Service", "Reserva/libera estoque")
+  System_Ext(fulfillmentService, "Fulfillment Center Service", "Valida/ativa capacidade de FC")
+  System_Ext(paymentService, "Payment Service", "Autoriza/captura/cancela pagamento")
+  System_Ext(shipmentService, "Shipment Service", "Cria/cancela entrega física")
+}
+
+Rel(orderController, orderApp, "CreateOrder(command)")
+Rel(orderApp, orderDomain, "Cria entidade Order")
+Rel(orderApp, orderRepo, "Persiste pedido", "Postgres")
+Rel(orderApp, sagaState, "Inicializa SagaState")
+Rel(orderApp, sagaRepo, "Persiste estado da saga", "Postgres")
+Rel(orderApp, processManager, "StartSaga(orderId)")
+
+Rel(processManager, kafka, "Publica: inventory.commands", "Kafka producer (Etapa 1)")
+Rel(processManager, kafka, "Publica: fulfillment.commands", "Kafka producer (Etapa 2)")
+Rel(processManager, kafka, "Publica: payment.commands", "Kafka producer (Etapa 3)")
+Rel(processManager, kafka, "Publica: shipment.commands", "Kafka producer (Etapa 4)")
+
+Rel(kafka, invCmd, "topic")
+Rel(kafka, fulfCmd, "topic")
+Rel(kafka, payCmd, "topic")
+Rel(kafka, shpCmd, "topic")
+
+Rel(invCmd, inventoryService, "Consome", "Kafka")
+Rel(fulfCmd, fulfillmentService, "Consome", "Kafka")
+Rel(payCmd, paymentService, "Consome", "Kafka")
+Rel(shpCmd, shipmentService, "Consome", "Kafka")
+
+Rel(paymentService, payApproved, "Publica (sucesso)", "Kafka")
+Rel(paymentService, payRejected, "Publica (falha)", "Kafka")
+Rel(payApproved, sagaConsumer, "Consome", "group: order-service")
+Rel(payRejected, sagaConsumer, "Consome — inicia compensação", "group: order-service")
+
+Rel(sagaConsumer, sagaRepo, "Atualiza estado da saga", "Postgres")
+Rel(sagaConsumer, processManager, "HandleSagaResponse(event)")
+
+Rel(processManager, outbox, "Grava order.created na Outbox", "Postgres (transação)")
+Rel(outbox, orderCreated, "Publica", "Kafka")
+Rel(processManager, outbox, "Grava order.cancelled na Outbox (compensação)", "Postgres")
+Rel(outbox, orderCancelled, "Publica", "Kafka")
+
+note right of processManager
+Saga steps (happy path):
+1. Reservar estoque (inventory.commands)
+2. Validar FC (fulfillment.commands)
+3. Autorizar pagamento (payment.commands)
+4. Criar shipment (shipment.commands)
+5. Publicar order.created (canônico)
+
+Compensações (por step com falha):
+4. Falha shipment → cancelar pagamento
+3. Falha pagamento → liberar estoque + FC
+2. Falha FC → liberar estoque
+1. Falha estoque → publicar order.cancelled
+end note
+
+note bottom of invCmd
+Tópicos internos (.commands) são comandos de orquestração.
+NÃO devem ser consumidos por outros domínios.
+Ver ADR-0001 e ADR-0002.
+end note
+
+@enduml

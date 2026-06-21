@@ -1,0 +1,74 @@
+@startuml
+' C4 Nível 3 - domínio Shipping Promise (fluxo síncrono de cotação)
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Meli Envios - C4 Nível 3 - Domínio Shipping Promise (Cotação Síncrona)
+caption Foco nas dependências síncronas do ShippingPromiseService para calcular a promessa de entrega.
+
+System_Boundary(platform, "Meli Envios Platform") {
+
+  Component_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
+    Component(promiseController, "ShippingPromiseController", "ASP.NET Core Controller", "Expõe POST /v1/shipping-promises (fallback síncrono)")
+    Component(promiseConsumer, "KafkaQuoteConsumer", "Infrastructure", "Consome checkout.shipping.quote.requested do Kafka")
+    Component(promiseApp, "ShippingPromiseCalculator", "Application Service", "Orquestra chamadas síncronas e compõe promessa")
+    Component(promiseDomain, "ShippingPromise (Aggregate)", "Domain Entity", "Promessa com prazo, modalidade, carrier e custo")
+    Component(promisePublisher, "KafkaPromisePublisher", "Infrastructure", "Publica shipping.promise.calculated no Kafka")
+    Component(circuitBreakers, "CircuitBreakerPolicies", "Infrastructure", "Políticas de circuit breaker por dependência (Polly)")
+  }
+
+  Component(catalogClient, "ProductCatalogClient", "HTTP Client", "GET /v1/products/{skuId}/logistics")
+  Component(inventoryClient, "InventoryClient", "HTTP Client", "GET /v1/inventory/{skuId}/availability")
+  Component(fulfillmentClient, "FulfillmentCenterClient", "HTTP Client", "GET /v1/fulfillment-centers/{fcId}/availability")
+  Component(routingClient, "RoutingClient", "HTTP Client", "POST /v1/routes/calculate")
+  Component(carrierClient, "CarrierClient", "HTTP Client", "POST /v1/carriers/options")
+  Component(pricingClient, "ShippingPricingClient", "HTTP Client", "POST /v1/pricing/freight")
+
+  System_Ext(catalogService, "Product Catalog Service", "Fornece peso, dimensões e restrições do produto")
+  System_Ext(inventoryService, "Inventory Service", "Consulta disponibilidade de estoque")
+  System_Ext(fulfillmentService, "Fulfillment Center Service", "Informa capacidade e cutoff do CD")
+  System_Ext(routingService, "Routing Service", "Calcula rota logística e SLA")
+  System_Ext(carrierService, "Carrier Service", "Lista opções de transportadora disponíveis")
+  System_Ext(pricingService, "Shipping Pricing Service", "Calcula custo de frete e subsídios")
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Backbone assíncrono")
+}
+
+Rel(promiseConsumer, promiseApp, "CalculatePromise(request)")
+Rel(promiseController, promiseApp, "CalculatePromise(request)")
+Rel(promiseApp, circuitBreakers, "Usa políticas Polly")
+Rel(promiseApp, catalogClient, "GetProductLogistics(skuId)")
+Rel(promiseApp, inventoryClient, "CheckAvailability(skuId, sellerId, fcId)")
+Rel(promiseApp, fulfillmentClient, "CheckCapacity(fcId, window)")
+Rel(promiseApp, routingClient, "CalculateRoute(origin, destination, mode)")
+Rel(promiseApp, carrierClient, "GetCarrierOptions(routeId, package)")
+Rel(promiseApp, pricingClient, "CalculateFreight(routeId, carrierId, package)")
+Rel(promiseApp, promiseDomain, "Cria ShippingPromise com resultado consolidado")
+Rel(promiseApp, promisePublisher, "PublishPromiseCalculated(promise)")
+Rel(promisePublisher, kafka, "Publica shipping.promise.calculated", "Kafka producer")
+
+Rel(catalogClient, catalogService, "HTTP GET", "x-correlation-id propagado")
+Rel(inventoryClient, inventoryService, "HTTP GET", "x-correlation-id propagado")
+Rel(fulfillmentClient, fulfillmentService, "HTTP GET", "x-correlation-id propagado")
+Rel(routingClient, routingService, "HTTP POST", "x-correlation-id propagado")
+Rel(carrierClient, carrierService, "HTTP POST", "x-correlation-id propagado")
+Rel(pricingClient, pricingService, "HTTP POST", "x-correlation-id propagado")
+
+note right of circuitBreakers
+Circuit breaker aplicado por dependência.
+Timeout: 500ms por chamada.
+Fallback: promessa degradada se alguma
+dependência indisponível.
+end note
+
+note bottom of promiseDomain
+ShippingPromise contém:
+- promiseId
+- estimatedDeliveryDate
+- mode (same_day, next_day, standard)
+- carrier
+- cost (buyerCost, grossCost, subsidyAmount)
+end note
+
+@enduml
