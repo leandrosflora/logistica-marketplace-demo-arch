@@ -9,7 +9,7 @@ caption Foco nas dependências síncronas do ShippingPromiseService para calcula
 
 System_Boundary(platform, "Meli Envios Platform") {
 
-  Component_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
+  Container_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
     Component(promiseController, "ShippingPromiseController", "ASP.NET Core Controller", "Expõe POST /v1/shipping-promises (fallback síncrono)")
     Component(promiseConsumer, "KafkaQuoteConsumer", "Infrastructure", "Consome checkout.shipping.quote.requested do Kafka")
     Component(promiseApp, "ShippingPromiseCalculator", "Application Service", "Orquestra chamadas síncronas e compõe promessa")
