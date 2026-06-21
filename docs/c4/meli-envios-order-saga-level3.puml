@@ -9,7 +9,7 @@ caption Fluxo interno da Saga de criação de pedido orquestrada pelo OrderProce
 
 System_Boundary(platform, "Meli Envios Platform") {
 
-  Component_Boundary(orderBound, "Order Service (.NET 8)") {
+  Container_Boundary(orderBound, "Order Service (.NET 8)") {
     Component(orderController, "OrderController", "ASP.NET Core Controller", "Expõe POST /v1/orders e POST /v1/orders/{id}/cancel")
     Component(orderApp, "OrderApplicationService", "Application Service", "Cria pedido e inicia saga via OrderProcessManager")
     Component(orderDomain, "Order (Aggregate)", "Domain Entity", "Pedido com status, itens, endereço e promessa")

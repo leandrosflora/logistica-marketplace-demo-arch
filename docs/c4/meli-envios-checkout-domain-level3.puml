@@ -13,7 +13,7 @@ System_Boundary(platform, "Meli Envios Platform") {
   Component(web, "Marketplace Web", "ASP.NET Core Razor", "Canal web do marketplace")
   Component(bff, "MarketplaceWeb.Bff", ".NET 8 BFF", "API orientada à experiência web, propaga x-correlation-id e x-client-id")
 
-  Component_Boundary(checkoutBound, "Checkout Service (.NET 8)") {
+  Container_Boundary(checkoutBound, "Checkout Service (.NET 8)") {
     Component(checkoutController, "CheckoutController", "ASP.NET Core Controller", "Expõe POST /v1/checkouts e POST /v1/checkouts/{id}/confirm")
     Component(checkoutApp, "CheckoutApplicationService", "Application Service", "Orquestra criação e confirmação do checkout")
     Component(checkoutDomain, "Checkout (Aggregate)", "Domain Entity", "Checkout com status, itens e promessa associada")
@@ -27,7 +27,7 @@ System_Boundary(platform, "Meli Envios Platform") {
   Component(quoteTopic, "Topic: checkout.shipping.quote.requested", "Kafka Topic", "Solicitação de cotação de frete")
   Component(promiseTopic, "Topic: shipping.promise.calculated", "Kafka Topic", "Resultado da promessa calculada")
 
-  Component_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
+  Container_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
     Component(promiseConsumer, "KafkaQuoteConsumer", "Infrastructure", "Consome checkout.shipping.quote.requested")
     Component(promiseApp, "ShippingPromiseCalculator", "Application Service", "Orquestra consultas síncronas e calcula promessa")
     Component(promiseDomain, "ShippingPromise (Aggregate)", "Domain Entity", "Promessa calculada com prazo, carrier e custo")
