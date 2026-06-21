@@ -85,6 +85,35 @@ Payload canônico:
 
 `checkoutId` é obrigatório para o consumer do `CheckoutService`.
 
+### `checkout.confirmed`
+
+Publicado por: `checkout-service`
+
+Consumido por: `order-service`, `audit-service`
+
+Payload canônico:
+
+```json
+{
+  "checkoutId": "uuid",
+  "buyerId": "uuid",
+  "sellerId": "uuid",
+  "shippingPromiseId": "promise_123",
+  "items": [
+    {
+      "skuId": "uuid",
+      "quantity": 1,
+      "unitPrice": 129.9
+    }
+  ],
+  "totalAmount": 129.9,
+  "currency": "BRL",
+  "confirmedAt": "2026-06-14T12:00:00Z"
+}
+```
+
+`checkoutId` e `shippingPromiseId` devem ser propagados para permitir que o `OrderService` associe o pedido à promessa de entrega calculada anteriormente.
+
 ### `order.created`
 
 Publicado por: `order-service`
@@ -294,6 +323,7 @@ Payload canônico (`schemaVersion: "1.0"`):
 |---|---|---|---|---|
 | `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
 | `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
+| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `items[]`, `totalAmount`, `currency`, `confirmedAt` | Alinhado |
 | `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
 | `order.confirmed` | `order-service` | `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `confirmedAt` | Especificado |
 | `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `cancellationReason`, `cancelledAt` | Especificado |
@@ -305,7 +335,7 @@ Payload canônico (`schemaVersion: "1.0"`):
 
 ## Tópicos internos de saga — OrderService
 
-Decisão arquitetural relacionada: [`ADR-0001 — Tópicos internos de saga do OrderService`](../adr/0001-order-service-internal-saga-topics.md).
+Decisão arquitetural relacionada: [`ADR-0007 — Tópicos internos de saga do OrderService`](../adr/0007-order-service-internal-saga-topics.md).
 
 Além dos tópicos canônicos de domínio, o `OrderService` utiliza tópicos internos para orquestração da saga de criação de pedido.
 

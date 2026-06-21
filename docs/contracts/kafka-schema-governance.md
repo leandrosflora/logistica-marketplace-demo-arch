@@ -80,6 +80,7 @@ var payload = JsonConvert.DeserializeObject<OrderCreatedPayload>(json, settings)
 |---|---|---|---|---|---|
 | `checkout.shipping.quote.requested` | Checkout Service | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `1.0` | 2026-06-14 |
 | `shipping.promise.calculated` | Shipping Promise Service | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `1.0` | 2026-06-14 |
+| `checkout.confirmed` | Checkout Service | `checkout-service` | `order-service`, `audit-service` | `1.0` | 2026-06-21 (novo) |
 | `order.created` | Order Service | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `1.0` | 2026-06-14 |
 | `shipment.created` | Shipment Service | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `1.1` | 2026-06-20 (adicionado `sellerId`) |
 | `shipment.status.updated` | Tracking Service | `tracking-service` | `notification-service`, `audit-service`, `order-service` | `1.0` | 2026-06-14 |

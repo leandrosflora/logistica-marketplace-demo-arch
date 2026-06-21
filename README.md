@@ -109,13 +109,14 @@ Revisão de alinhamento em [`docs/reviews/kafka-e2e-contract-review-2026-06-14.m
 |---|---|---|---|
 | `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | Alinhado |
 | `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | Alinhado |
+| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | Alinhado |
 | `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | Alinhado |
 | `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | Alinhado |
 | `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | Alinhado |
 
 ### Tópicos internos de saga do OrderService
 
-Decisão documentada em [`docs/adr/0001-order-service-internal-saga-topics.md`](docs/adr/0001-order-service-internal-saga-topics.md).
+Decisão documentada em [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md).
 
 | Tópico | Tipo | Finalidade |
 |---|---|---|
@@ -179,7 +180,7 @@ OrderService
 ## ADRs
 
 - [`docs/adr/0001-use-event-driven-architecture.md`](docs/adr/0001-use-event-driven-architecture.md)
-- [`docs/adr/0001-order-service-internal-saga-topics.md`](docs/adr/0001-order-service-internal-saga-topics.md)
+- [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md)
 - [`docs/adr/0002-saga-orchestrator-pattern.md`](docs/adr/0002-saga-orchestrator-pattern.md)
 - [`docs/adr/0003-hexagonal-clean-architecture.md`](docs/adr/0003-hexagonal-clean-architecture.md)
 - [`docs/adr/0004-kafka-schema-versioning.md`](docs/adr/0004-kafka-schema-versioning.md)

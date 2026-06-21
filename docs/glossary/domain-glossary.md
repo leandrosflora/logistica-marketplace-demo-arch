@@ -248,7 +248,7 @@ Definições formais dos termos usados no ecossistema Logística Envios. Todos o
 **Termos relacionados:** Tópico Interno, Envelope Kafka, SchemaVersion
 
 ### Tópico Interno (Saga)
-**Definição:** Tópico Kafka usado internamente pelo `OrderService` para orquestração da saga de criação de pedido. Não deve ser consumido por outros domínios sem decisão arquitetural. Documentado em [ADR-0001](../adr/0001-order-service-internal-saga-topics.md).
+**Definição:** Tópico Kafka usado internamente pelo `OrderService` para orquestração da saga de criação de pedido. Não deve ser consumido por outros domínios sem decisão arquitetural. Documentado em [ADR-0007](../adr/0007-order-service-internal-saga-topics.md).
 **Contexto de uso:** `inventory.commands`, `fulfillment.commands`, `payment.commands`, `shipment.commands`, `order.events`.
 **Termos relacionados:** Tópico Canônico, Saga Orchestrator, Order Service
 

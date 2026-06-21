@@ -26,6 +26,17 @@ Esta pasta contém os diagramas de sequência da jornada de envios, cobrindo flu
 | [`16-alt-delivery-exception-and-notification.puml`](16-alt-delivery-exception-and-notification.puml) | Exceção de entrega, atualização de tracking e notificação. |
 | [`17-alt-cancel-order-before-shipment.puml`](17-alt-cancel-order-before-shipment.puml) | Cancelamento do pedido antes da criação do shipment. |
 
+## Convenção de nomenclatura
+
+Os diagramas de sequência usam dois níveis de nomenclatura para mensagens Kafka:
+
+| Nível | Exemplo no diagrama | Equivalente no contrato |
+|---|---|---|
+| Nome do tópico canônico | `checkout.confirmed` | Tópico em `kafka-events.md` |
+| Nome da classe C# (.NET) | `CheckoutConfirmedIntegrationEvent` | Classe no microservice |
+
+Quando o diagrama mostra `Checkout -> Kafka: CheckoutConfirmedIntegrationEvent`, isso corresponde ao tópico canônico `checkout.confirmed` documentado em [`docs/contracts/kafka-events.md`](../contracts/kafka-events.md). A tabela de mapeamento completa está na [matriz de contratos](../contracts/kafka-events.md#matriz-final-dos-contratos-canônicos).
+
 ## Renderização
 
 Os arquivos `.puml` são renderizados para `.svg` pelo workflow:

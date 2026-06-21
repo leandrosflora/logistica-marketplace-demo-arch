@@ -29,6 +29,7 @@ Cria e mantém o pedido após confirmação do checkout. Orquestra a saga de cri
 
 | Tópico | Consumer Group | Finalidade |
 |---|---|---|
+| `checkout.confirmed` | `order-service` | Disparar criação do pedido e início da saga |
 | `shipment.status.updated` | `order-service` | Atualizar status de entrega no pedido |
 | `payment.approved` | `order-service` | Avançar saga após aprovação de pagamento |
 | `payment.rejected` | `order-service` | Iniciar compensação da saga |
@@ -61,6 +62,6 @@ Tópicos internos publicados pelo `OrderProcessManager`:
 
 ## Decisões arquiteturais relacionadas
 
-- [ADR-0001 — Tópicos internos de saga](../adr/0001-order-service-internal-saga-topics.md)
+- [ADR-0007 — Tópicos internos de saga](../adr/0007-order-service-internal-saga-topics.md)
 - [ADR-0002 — Saga Orchestrator](../adr/0002-saga-orchestrator-pattern.md)
 - [ADR-0005 — Estratégia de Idempotência](../adr/0005-idempotency-strategy.md)

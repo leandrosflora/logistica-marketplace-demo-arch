@@ -55,4 +55,4 @@ Cria a entrega física do pedido: gera etiqueta, define volume, atribui código 
 ## Decisões arquiteturais relacionadas
 
 - [ADR-0005 — Estratégia de Idempotência](../adr/0005-idempotency-strategy.md)
-- [ADR-0001 — Tópicos internos de saga](../adr/0001-order-service-internal-saga-topics.md)
+- [ADR-0007 — Tópicos internos de saga](../adr/0007-order-service-internal-saga-topics.md)

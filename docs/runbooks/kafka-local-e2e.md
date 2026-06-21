@@ -64,7 +64,7 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 
 ## Criar tópicos internos de saga do OrderService
 
-Esses tópicos foram formalizados pela [`ADR-0001`](../adr/0001-order-service-internal-saga-topics.md).
+Esses tópicos foram formalizados pela [`ADR-0007`](../adr/0007-order-service-internal-saga-topics.md).
 
 ```bash
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1

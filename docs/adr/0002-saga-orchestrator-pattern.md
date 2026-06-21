@@ -39,7 +39,7 @@ O `OrderProcessManager` é responsável por:
 3. Avançar para a próxima etapa ou iniciar compensações em caso de falha.
 4. Publicar eventos canônicos de domínio ao final de cada transição relevante (`order.created`, `order.confirmed`, `order.cancelled`).
 
-Os tópicos internos de saga são regidos pelo [ADR-0001](0001-order-service-internal-saga-topics.md).
+Os tópicos internos de saga são regidos pelo [ADR-0007](0007-order-service-internal-saga-topics.md).
 
 ## Justificativa
 
@@ -78,5 +78,5 @@ Para um fluxo de criação de pedido com múltiplas compensações possíveis e 
 
 ## Decisões relacionadas
 
-- [ADR-0001 — Tópicos internos de saga do OrderService](0001-order-service-internal-saga-topics.md)
+- [ADR-0007 — Tópicos internos de saga do OrderService](0007-order-service-internal-saga-topics.md)
 - [ADR-0001 — Usar arquitetura orientada a eventos para fluxos pós-pedido](0001-use-event-driven-architecture.md)
