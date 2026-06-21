@@ -138,10 +138,10 @@ Para desenvolvimento local, usar **User Secrets do .NET**:
 ```bash
 dotnet user-secrets init
 dotnet user-secrets set "Kafka:BootstrapServers" "localhost:9092"
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=logistica_envios;Username=meli;Password=meli"
+dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Database=logistica_envios;Username=logistica;Password=logistica"
 ```
 
-Os valores do `docker-compose.yml` deste repositório (usuário `meli`, senha `meli`) são exclusivos para ambiente local e não devem ser usados em staging ou produção.
+Os valores do `docker-compose.yml` deste repositório (usuário `logistica`, senha `logistica`) são exclusivos para ambiente local e não devem ser usados em staging ou produção.
 
 ### Staging e Produção
 
