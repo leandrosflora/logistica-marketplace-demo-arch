@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: Meli Envios - API Contracts
+  title: Logística Envios - API Contracts
   version: 1.0.0
   description: >-
     Contratos OpenAPI consolidados a partir dos READMEs e contratos públicos dos
-    repositórios envolvidos no case Meli Envios. Este arquivo é a visão canônica
+    repositórios envolvidos no case Logística Envios. Este arquivo é a visão canônica
     para integração entre Frontend/BFF e microservices.
 servers:
   - url: http://localhost
