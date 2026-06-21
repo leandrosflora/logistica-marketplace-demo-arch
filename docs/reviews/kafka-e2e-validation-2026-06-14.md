@@ -2,228 +2,137 @@
 
 Data: 2026-06-14
 
+Última revisão documental: 2026-06-21
+
 ## Escopo
 
-Validação estática das modificações recentes nos microservices solicitados para habilitar teste end-to-end local com Kafka:
+Validação estática dos contratos e runbooks necessários para habilitar teste end-to-end local com Kafka entre os microservices principais:
 
-- `OrderService`
-- `ShipmentService`
-- `NotificationService`
 - `CheckoutService`
 - `ShippingPromiseService`
+- `OrderService`
+- `ShipmentService`
 - `TrackingService`
+- `NotificationService`
+- `AuditService`
 
-Referência arquitetural usada:
+Referências arquiteturais usadas:
 
 - `docs/contracts/kafka-events.md`
+- `docs/contracts/kafka-schema-governance.md`
+- `docs/runbooks/kafka-local-e2e.md`
+- `docs/adr/0007-order-service-internal-saga-topics.md`
 - `docker-compose.yml`
-- diagramas C4 N3 de Kafka em `docs/c4`
+- diagramas C4 em `docs/c4`
 
 ## Resultado executivo
 
-Status geral: **parcialmente pronto para E2E Kafka local**.
+Status geral: **pronto para validação E2E local por fases**.
 
-O broker local está definido no `docker-compose.yml` como:
+Os contratos Kafka canônicos estão alinhados entre os serviços principais. O broker local está definido no `docker-compose.yml` como:
 
 - Broker externo para serviços rodando na máquina: `localhost:9092`
 - Broker interno para containers: `kafka:29092`
 - Kafka UI: `http://localhost:8088`
 
-Foram implementadas integrações Kafka reais em cinco serviços:
+A validação final ainda depende da execução local ou em CI dos microservices com .NET 8, Postgres, Redis e Kafka.
 
-- `OrderService`
-- `ShipmentService`
-- `NotificationService`
-- `ShippingPromiseService`
-- `TrackingService`
+## Matriz de implementação esperada
 
-O `CheckoutService` ainda não possui implementação Kafka detectável no código atual.
-
-## Matriz de implementação validada
-
-| Serviço | Kafka atual | Producer | Consumer | Status |
+| Serviço | Producer | Consumer | Consumer group | Status documental |
 |---|---|---|---|---|
-| `OrderService` | Real com `Confluent.Kafka` | `order.created` | `shipment.status.updated` | OK com ressalva |
-| `ShipmentService` | Real com `Confluent.Kafka` | `shipment.created` via Outbox | `order.created` | OK com ressalva crítica |
-| `TrackingService` | Real com `Confluent.Kafka` | `shipment.status.updated` via Outbox | `shipment.created` | OK com ressalva |
-| `NotificationService` | Real consumer com `Confluent.Kafka` | Não publica | `order.created`, `shipment.created`, `shipment.status.updated` | OK com ressalva |
-| `ShippingPromiseService` | Real producer com `Confluent.Kafka` | `shipping.promise.calculated` | Não consome | OK |
-| `CheckoutService` | Não detectado | Pendente | Pendente | Não pronto para Kafka E2E completo |
+| `CheckoutService` | `checkout.shipping.quote.requested`, `checkout.confirmed` | `shipping.promise.calculated` | `checkout-service` | Alinhado |
+| `ShippingPromiseService` | `shipping.promise.calculated` | `checkout.shipping.quote.requested` | `shipping-promise-service` | Alinhado |
+| `OrderService` | `order.created`, `order.confirmed`, `order.cancelled` e tópicos internos de saga | `checkout.confirmed`, `shipment.status.updated`, `payment.approved`, `payment.rejected` | `order-service` | Alinhado |
+| `ShipmentService` | `shipment.created`, `shipment.cancelled` | `order.created` | `shipment-service` | Alinhado |
+| `TrackingService` | `shipment.status.updated` | `shipment.created`, `shipment.cancelled` | `tracking-service` | Alinhado |
+| `NotificationService` | - | `order.created`, `order.confirmed`, `order.cancelled`, `shipment.created`, `shipment.status.updated`, `shipment.cancelled`, `payment.rejected` | `notification-service` | Alinhado |
+| `AuditService` | - | Eventos canônicos de domínio | `audit-service` | Alinhado |
 
-## Tópicos canônicos usados
+## Tópicos canônicos validados
 
-| Tópico | Producer | Consumers |
-|---|---|---|
-| `checkout.shipping.quote.requested` | `CheckoutService` | `audit-service`, `analytics` |
-| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService`, `audit-service`, `analytics` |
-| `order.created` | `OrderService` | `ShipmentService`, `NotificationService`, `AuditService` |
-| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `AuditService` |
-| `shipment.status.updated` | `TrackingService` | `NotificationService`, `AuditService`, `OrderService` |
+| Tópico | Producer | Consumers | Status |
+|---|---|---|---|
+| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | Alinhado |
+| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | Alinhado |
+| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | Alinhado |
+| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | Alinhado |
+| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | Especificado |
+| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | Especificado |
+| `payment.approved` | `payment-service` | `order-service`, `audit-service` | Especificado |
+| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | Especificado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | Alinhado |
+| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | Alinhado |
+| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | Especificado |
 
-## Evidências por serviço
+## Tópicos internos de saga
 
-### OrderService
+O `OrderService` utiliza tópicos internos para orquestração da saga. Esses tópicos foram formalizados pela [`ADR-0007`](../adr/0007-order-service-internal-saga-topics.md) e documentados em `docs/contracts/kafka-events.md`.
 
-PR validado:
+| Tópico | Tipo | Producer | Consumer principal | Status |
+|---|---|---|---|---|
+| `inventory.commands` | Command | `order-service` | `inventory-service` | Interno documentado |
+| `fulfillment.commands` | Command | `order-service` | `fulfillment-center-service` | Interno documentado |
+| `payment.commands` | Command | `order-service` | `payment-service` | Interno documentado |
+| `shipment.commands` | Command | `order-service` | `shipment-service` | Interno documentado |
+| `order.events` | Internal Event | `order-service` | Consumidores internos controlados | Interno documentado |
 
-- `OrderService#3` - `Add real Kafka integration (produce order.created, consume shipment.status.updated)`
+## Ordem recomendada para execução local
 
-Implementação observada:
+### Fase 0 - Infraestrutura Kafka
 
-- Configuração `Kafka:BootstrapServers = localhost:9092` em `appsettings.Development.json`.
-- `ConsumerGroupId = order-service`.
-- Tópicos configurados: `order.created` e `shipment.status.updated`.
-- DI registra `IProducer<string,string>`, `KafkaIntegrationEventBus`, `OutboxDispatcher` e `ShipmentStatusUpdatedConsumer`.
-- Consumer `ShipmentStatusUpdatedConsumer` assina `shipment.status.updated` e chama `OrderProcessManager.HandleShipmentStatusUpdatedAsync`.
+1. Subir Kafka, Kafka UI, Redis e Postgres.
+2. Criar tópicos canônicos.
+3. Criar tópicos internos de saga.
+4. Validar tópicos no Kafka UI.
 
-Ressalva:
+### Fase 1 - Smoke test por tópico
 
-- O `OrderProcessManager` ainda grava comandos/tópicos legados fora do contrato canônico atual: `inventory.commands`, `fulfillment.commands`, `payment.commands`, `shipment.commands`, `order.events`.
-- Esses tópicos devem ser classificados como tópicos internos de saga ou migrados para nomes canônicos em `docs/contracts/kafka-events.md`.
-
-### ShipmentService
-
-PR validado:
-
-- `ShipmentService#5` - `Implement Kafka shipment creation flow`
-
-Implementação observada:
-
-- Configuração `Kafka:BootstrapServers = localhost:9092` em `appsettings.Development.json`.
-- `ConsumerGroupId = shipment-service`.
-- Tópicos configurados: `order.created` e `shipment.created`.
-- `OrderCreatedKafkaConsumer` consome `order.created`.
-- `KafkaMessagePublisher` publica mensagens da Outbox.
-- `ShipmentCreationHandler` grava `shipment.created` na Outbox.
-
-Ressalva crítica para E2E local:
-
-- `appsettings.Development.json` mantém `FeatureFlags:UseMockShipmentRepository = true`, mas `ShipmentCreationHandler` depende diretamente de `ShipmentDbContext`, `InboxMessages`, `Shipments`, transação e Outbox.
-- Ou seja: mesmo com repository mock ligado, o fluxo Kafka de criação de shipment ainda exige banco real e schema aplicado.
-- Para rodar E2E local, é necessário ter o banco/schema do `ShipmentService` funcionando ou refatorar o handler para usar portas abstraídas também para Inbox/Outbox/Unit of Work.
-
-### TrackingService
-
-PRs validados:
-
-- `TrackingService#4` - `Implementar integração Kafka real com Confluent.Kafka`
-- `TrackingService#5` - `Fix Kafka offset commit overload`
-
-Implementação observada:
-
-- Configuração `Kafka:BootstrapServers = localhost:9092` em `appsettings.Development.json`.
-- `ConsumerGroupId = tracking-service`.
-- Tópicos configurados: `shipment.created` e `shipment.status.updated`.
-- `KafkaTrackingMessageConsumer` consome `shipment.created` e mapeia para evento interno de tracking.
-- `KafkaIntegrationEventBus` publica `shipment.status.updated`.
-- Correção de commit de offset aplicada usando `TopicPartitionOffset` em array.
-
-Ressalva:
-
-- `FeatureFlags:MockTrackingRepository:Enabled = true` em Development, mas `Program.cs` ainda registra `TrackingDbContext` e health check de DB.
-- Se o banco não existir, `/health` pode falhar mesmo em modo mock.
-
-### NotificationService
-
-PR validado:
-
-- `NotificationService#5` - `Implement Kafka notification consumers`
-
-Implementação observada:
-
-- Configuração `Kafka:BootstrapServers = localhost:9092` em `appsettings.Development.json`.
-- `ConsumerGroupId = notification-service`.
-- Tópicos configurados: `order.created`, `shipment.created`, `shipment.status.updated`.
-- `KafkaNotificationConsumer` assina os três tópicos canônicos.
-- Valida envelope, lê `eventType`, `eventId`, `correlationId` e despacha para `NotificationPlanner`.
-
-Ressalva:
-
-- Não há producer Kafka neste serviço; isso está correto para o escopo atual.
-- Health check de DB permanece registrado no readiness, mesmo com `MockNotificationRepository` ativo em Development.
-
-### ShippingPromiseService
-
-PR validado:
-
-- `ShippingPromiseService#7` - `Add Kafka publisher for shipping.promise.calculated events`
-
-Implementação observada:
-
-- Configuração `Kafka:BootstrapServers = localhost:9092` em `appsettings.Development.json`.
-- `ConsumerGroupId = shipping-promise-service`.
-- Tópico configurado: `shipping.promise.calculated`.
-- `Program.cs` registra `KafkaOptions` com validação e `KafkaShippingPromiseEventPublisher` como `IShippingPromiseEventPublisher`.
-- Publicação best-effort preserva o fluxo HTTP síncrono.
-
-Status: OK.
-
-### CheckoutService
-
-Validação observada:
-
-- Não foi detectada implementação Kafka ou dependência `Confluent.Kafka` no código atual.
-- Não foi encontrado PR recente de Kafka para `CheckoutService`.
-
-Impacto:
-
-- O ciclo `checkout.shipping.quote.requested` -> `shipping.promise.calculated` ainda não está completo no código.
-- Para E2E local focado em `order.created` -> `shipment.created` -> `shipment.status.updated` -> notification, o CheckoutService pode ficar fora inicialmente.
-- Para E2E completo desde cotação/promise via Kafka, o CheckoutService precisa implementar producer/consumer Kafka conforme contrato.
-
-## Validação de compatibilidade com docker-compose
-
-O `docker-compose.yml` do repo de arquitetura está compatível com as configurações dos serviços:
-
-- Kafka expõe `localhost:9092` para aplicações rodando fora do Docker.
-- Kafka UI expõe `http://localhost:8088`.
-- Kafka UI aponta internamente para `kafka:29092`.
-
-## Bloqueios para E2E local real
-
-### Bloqueio 1 - Banco/schemas
-
-Alguns serviços registram `DbContext` e usam Outbox/Inbox reais mesmo com mocks habilitados.
-
-Serviços com maior risco:
-
-- `ShipmentService`
-- `TrackingService`
-- `NotificationService`
-- `OrderService`
-
-Para E2E real, existem duas opções:
-
-1. Aplicar schemas no Postgres local para cada serviço.
-2. Criar modo E2E local com mocks também para Inbox/Outbox/Unit of Work.
-
-### Bloqueio 2 - CheckoutService ainda sem Kafka
-
-Sem Kafka no CheckoutService, a cadeia de cotação/promise assíncrona ainda não fecha.
-
-### Bloqueio 3 - Tópicos internos de saga não documentados
-
-O `OrderService` ainda usa tópicos internos como:
-
-- `inventory.commands`
-- `fulfillment.commands`
-- `payment.commands`
-- `shipment.commands`
-- `order.events`
-
-Esses tópicos não constam no contrato canônico atual. Devem ser documentados ou substituídos por tópicos canônicos.
-
-## Recomendação de execução local por fases
-
-### Fase 1 - Kafka básico
-
-Validar publicação e consumo com estes tópicos:
+Validar produção e consumo manual dos tópicos principais:
 
 ```text
+checkout.shipping.quote.requested
+shipping.promise.calculated
+checkout.confirmed
 order.created
 shipment.created
 shipment.status.updated
 ```
+
+### Fase 2 - Promise assíncrona
+
+Serviços mínimos:
+
+```text
+CheckoutService
+ShippingPromiseService
+```
+
+Fluxo esperado:
+
+1. `CheckoutService` publica `checkout.shipping.quote.requested` com `checkoutId`.
+2. `ShippingPromiseService` consome `checkout.shipping.quote.requested`.
+3. `ShippingPromiseService` publica `shipping.promise.calculated` com o mesmo `checkoutId`.
+4. `CheckoutService` consome `shipping.promise.calculated` e grava/projeta a promise.
+
+### Fase 3 - Confirmação de checkout e criação de pedido
+
+Serviços mínimos:
+
+```text
+CheckoutService
+OrderService
+```
+
+Fluxo esperado:
+
+1. `CheckoutService` confirma o checkout.
+2. `CheckoutService` publica `checkout.confirmed`.
+3. `OrderService` consome `checkout.confirmed`.
+4. `OrderService` inicia a saga de criação de pedido.
+5. `OrderService` publica `order.created` após conclusão da criação do pedido.
+
+### Fase 4 - Pedido, shipment, tracking e notification
 
 Serviços mínimos:
 
@@ -234,49 +143,56 @@ TrackingService
 NotificationService
 ```
 
-### Fase 2 - Promise assíncrona
+Fluxo esperado:
 
-Adicionar:
+1. `OrderService` publica `order.created`.
+2. `ShipmentService` consome `order.created` e publica `shipment.created`.
+3. `TrackingService` consome `shipment.created` e publica `shipment.status.updated`.
+4. `NotificationService` consome eventos canônicos relevantes.
+5. `OrderService` consome `shipment.status.updated` e atualiza status de entrega no pedido.
 
-```text
-ShippingPromiseService
-```
+### Fase 5 - E2E integrado
 
-Validar publicação de:
-
-```text
-shipping.promise.calculated
-```
-
-### Fase 3 - Checkout assíncrono completo
-
-Implementar Kafka no:
+Serviços:
 
 ```text
 CheckoutService
+ShippingPromiseService
+OrderService
+ShipmentService
+TrackingService
+NotificationService
+AuditService
 ```
 
-Validar:
+Objetivo:
 
-```text
-checkout.shipping.quote.requested
-shipping.promise.calculated
-```
+1. Criar checkout.
+2. Calcular promise assíncrona.
+3. Confirmar checkout.
+4. Criar pedido.
+5. Criar shipment.
+6. Atualizar tracking/status inicial.
+7. Planejar notificações.
+8. Persistir trilha de auditoria.
+9. Validar mensagens no Kafka UI.
 
 ## Comandos de validação local
 
-Criar tópicos manualmente, se necessário:
+Criar tópicos canônicos manualmente, se necessário:
 
 ```bash
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic order.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
 
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
 
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.status.updated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.confirmed --partitions 1 --replication-factor 1
 
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipping.promise.calculated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
 
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
 ```
 
 Listar tópicos:
@@ -291,16 +207,13 @@ Abrir UI:
 http://localhost:8088
 ```
 
+## Bloqueios e riscos operacionais
+
+1. Alguns serviços podem exigir `DbContext`, `Inbox` e `Outbox` reais mesmo com repository mock habilitado.
+2. Para E2E real, é necessário aplicar schemas locais ou usar mocks transacionais para Inbox/Outbox quando implementados.
+3. Health checks podem falhar em modo mock se ainda dependerem de banco real.
+4. A execução final deve rodar `dotnet restore`, `dotnet build`, `dotnet test` e o fluxo Kafka local/CI nos repositórios de microservice.
+
 ## Parecer final
 
-As alterações estão bem direcionadas e seguem a intenção arquitetural de E2E local com Kafka, especialmente nos fluxos de pedido, shipment, tracking e notification.
-
-O estado atual já permite avançar para testes locais de Kafka, mas não garante E2E completo sem preparação de banco/schema ou ajustes adicionais de mocks transacionais.
-
-Para fechar a integridade da solução, faltam:
-
-1. Implementar Kafka no `CheckoutService`.
-2. Decidir/documentar tópicos internos de saga usados pelo `OrderService`.
-3. Corrigir health checks em modo mock.
-4. Garantir schemas locais para serviços com Outbox/Inbox reais.
-5. Rodar `dotnet restore`, `dotnet build`, `dotnet test` em ambiente com .NET 8.
+A arquitetura documental está coerente para validação E2E local por fases. Os tópicos canônicos, os tópicos internos de saga, o runbook Kafka e as specs de serviço estão alinhados. A principal pendência restante é operacional: executar o E2E real em ambiente local ou CI com os microservices e schemas necessários.
