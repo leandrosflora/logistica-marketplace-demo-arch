@@ -28,6 +28,7 @@ Acompanha e processa eventos de rastreio de entrega, mantém a linha do tempo de
 | Tópico | Consumer Group | Finalidade |
 |---|---|---|
 | `shipment.created` | `tracking-service` | Iniciar rastreio de um novo shipment |
+| `shipment.cancelled` | `tracking-service` | Encerrar rastreio de um shipment cancelado |
 
 ## Dependências síncronas
 

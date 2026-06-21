@@ -14,6 +14,7 @@
 | Carrier Service | Integração | transportadoras e restrições | rota, CEP, pacote | opções de carrier |
 | Shipping Pricing Service | Domínio precificação | custo, frete, subsídio | rota, carrier, pacote | preço de frete |
 | Order Service | Domínio pedido | pedido confirmado | checkout confirmado | pedido |
+| Payment Service | Domínio pagamento | autorização e captura de pagamento | comando de saga (`payment.commands`) | `payment.approved` / `payment.rejected` |
 | Shipment Service | Domínio entrega | shipment, volume, etiqueta | order created | shipment |
 | Tracking Service | Domínio tracking | status de entrega | eventos de carrier/shipment | linha do tempo |
 | Notification Service | Plataforma | notificações | eventos de domínio | mensagens ao cliente |

@@ -13,10 +13,12 @@ Gerencia saldo e reservas de estoque por SKU, seller e fulfillment center. Respo
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `GET` | `/v1/inventory/{skuId}/availability` | Consulta disponibilidade por SKU/seller/FC |
-| `POST` | `/v1/inventory/reservations` | Cria reserva de estoque (comando idempotente) |
-| `DELETE` | `/v1/inventory/reservations/{reservationId}` | Libera reserva (compensação de saga) |
+| `GET` | `/v1/inventory/{sellerId}/{skuId}` | Consulta disponibilidade de um SKU por seller |
+| `POST` | `/v1/inventory/availability/batch` | Consulta disponibilidade de múltiplos SKUs/sellers (usado no fluxo de cotação) |
+| `POST` | `/v1/inventory/reservations` | Cria reserva de estoque (comando idempotente via `x-idempotency-key`) |
 | `POST` | `/v1/inventory/reservations/{reservationId}/confirm` | Confirma reserva (estoque efetivamente baixado) |
+| `POST` | `/v1/inventory/reservations/{reservationId}/release` | Libera reserva (compensação de saga) |
+| `POST` | `/v1/inventory/adjustments` | Ajusta saldo de estoque manualmente (operação administrativa) |
 
 ## Eventos Kafka publicados
 

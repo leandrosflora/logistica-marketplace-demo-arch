@@ -12,8 +12,10 @@ Fornece atributos logísticos dos produtos: peso, dimensões, categoria e restri
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `GET` | `/v1/products/{skuId}/logistics` | Retorna atributos logísticos de um SKU |
-| `GET` | `/v1/products/logistics/batch` | Retorna atributos de múltiplos SKUs (query param `skuIds`) |
+| `GET` | `/v1/products/{skuId}` | Retorna dados gerais de um SKU |
+| `GET` | `/v1/products/{skuId}/physical-info` | Retorna atributos físicos/logísticos de um SKU (peso, dimensões, restrições) |
+| `POST` | `/v1/products/physical-info/batch` | Retorna atributos físicos de múltiplos SKUs (usado no fluxo de cotação) |
+| `GET` | `/v1/products/{skuId}/status` | Retorna status de ativação/disponibilidade de um SKU |
 
 ## Eventos Kafka publicados
 
@@ -33,7 +35,7 @@ Nenhuma (fonte de dados proprietária).
 |---|---|---|
 | Disponibilidade | ≥ 99.95% | 21 min/mês |
 | Error rate (5xx) | < 0.05% das requisições | — |
-| Latência P99 `GET /v1/products/{skuId}` | < 50 ms | — |
+| Latência P99 `GET /v1/products/{skuId}/physical-info` | < 50 ms | — |
 | Latência P99 `POST /v1/products/physical-info/batch` | < 100 ms | — |
 | Cache hit rate (Redis) | ≥ 95% | — |
 

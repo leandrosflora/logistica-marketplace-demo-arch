@@ -31,6 +31,7 @@ Cria e mantém o pedido após confirmação do checkout. Orquestra a saga de cri
 |---|---|---|
 | `checkout.confirmed` | `order-service` | Disparar criação do pedido e início da saga |
 | `shipment.status.updated` | `order-service` | Atualizar status de entrega no pedido |
+| `shipment.cancelled` | `order-service` | Atualizar pedido quando um shipment é cancelado externamente |
 | `payment.approved` | `order-service` | Avançar saga após aprovação de pagamento |
 | `payment.rejected` | `order-service` | Iniciar compensação da saga |
 
