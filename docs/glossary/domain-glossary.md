@@ -1,6 +1,6 @@
-# Glossário de Domínio — Meli Envios
+# Glossário de Domínio — Logística Envios
 
-Definições formais dos termos usados no ecossistema Meli Envios. Todos os agentes de IA e desenvolvedores devem consultar este glossário para garantir linguagem ubíqua consistente em código, contratos e documentação.
+Definições formais dos termos usados no ecossistema Logística Envios. Todos os agentes de IA e desenvolvedores devem consultar este glossário para garantir linguagem ubíqua consistente em código, contratos e documentação.
 
 ---
 

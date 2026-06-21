@@ -4,10 +4,10 @@
 
 LAYOUT_WITH_LEGEND()
 
-title Meli Envios - C4 Nível 3 - Saga Orchestrator (OrderService)
+title Logística Envios - C4 Nível 3 - Saga Orchestrator (OrderService)
 caption Fluxo interno da Saga de criação de pedido orquestrada pelo OrderProcessManager no OrderService.
 
-System_Boundary(platform, "Meli Envios Platform") {
+System_Boundary(platform, "Logística Envios Platform") {
 
   Container_Boundary(orderBound, "Order Service (.NET 8)") {
     Component(orderController, "OrderController", "ASP.NET Core Controller", "Expõe POST /v1/orders e POST /v1/orders/{id}/cancel")

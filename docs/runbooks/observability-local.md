@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Inicializar e usar a stack de observabilidade local (Prometheus, Grafana, Jaeger) para diagnosticar requisições E2E, visualizar métricas e rastrear spans entre microservices do case Meli Envios.
+Inicializar e usar a stack de observabilidade local (Prometheus, Grafana, Jaeger) para diagnosticar requisições E2E, visualizar métricas e rastrear spans entre microservices do case Logística Envios.
 
 Decisão arquitetural relacionada: [ADR-0006 — Stack de Observabilidade](../adr/0006-observability-stack.md).
 
@@ -135,7 +135,7 @@ O `correlationId` do envelope Kafka pode ser usado como tag de busca no Jaeger:
 
 ```bash
 # Ver correlationId em mensagens Kafka
-docker exec -it meli-envios-kafka kafka-console-consumer \
+docker exec -it logistica-envios-kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
   --topic order.created \
   --from-beginning \

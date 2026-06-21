@@ -1,4 +1,4 @@
-# Validação Kafka E2E local - Microservices Meli Envios
+# Validação Kafka E2E local - Microservices Logística Envios
 
 Data: 2026-06-14
 
@@ -268,21 +268,21 @@ shipping.promise.calculated
 Criar tópicos manualmente, se necessário:
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic order.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic order.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.created --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.created --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.status.updated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipment.status.updated --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipping.promise.calculated --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic shipping.promise.calculated --partitions 1 --replication-factor 1
 
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
 ```
 
 Listar tópicos:
 
 ```bash
-docker exec -it meli-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
 Abrir UI:

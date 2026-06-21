@@ -1,8 +1,8 @@
-# Contratos - Meli Envios
+# Contratos - Logística Envios
 
 ## OpenAPI
 
-- [`meli-envios-apis.openapi.yaml`](meli-envios-apis.openapi.yaml): contrato OpenAPI consolidado dos serviços envolvidos no case.
+- [`logistica-envios-apis.openapi.yaml`](logistica-envios-apis.openapi.yaml): contrato OpenAPI consolidado dos serviços envolvidos no case.
 
 ## Validação
 

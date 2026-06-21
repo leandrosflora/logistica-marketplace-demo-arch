@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: 'meli-envios'
+  - name: 'logistica-envios'
     orgId: 1
-    folder: 'Meli Envios'
+    folder: 'Logística Envios'
     type: file
     disableDeletion: false
     editable: true

@@ -1,4 +1,4 @@
-# Sequence diagrams - Meli Envios
+# Sequence diagrams - Logística Envios
 
 Esta pasta contém os diagramas de sequência da jornada de envios, cobrindo fluxo feliz e fluxos alternativos.
 
