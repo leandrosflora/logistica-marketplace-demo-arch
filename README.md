@@ -6,7 +6,7 @@ Objetivo: dar contexto suficiente para o Codex entender o domínio, os microserv
 
 ## Licença
 
-Este repositório e todos os seus conteúdos são proprietários e confidenciais (All Rights Reserved). Nenhuma parte deste repositório pode ser copiada, reproduzida, transmitida ou utilizada sem permissão expressa do proprietário.
+Este repositório está licenciado sob a **Apache License 2.0**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
 
 ## Estado atual
 
