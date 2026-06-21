@@ -102,7 +102,6 @@ Serviços: `order-service`, `payment-service`, `shipment-service`.
 | `tracking-service` | > 200 ms | < 99.9% | lag eventos de carrier > 20 s |
 | `notification-service` | — | < 99.5% | lag qualquer tópico > 30 s |
 | `audit-service` | > 800 ms | < 99.5% | lag qualquer tópico > 15 s |
-| `payment-service` | > 6 s (autorização) | < 99.9% | lag `payment.commands` > 5 s |
 
 ---
 
