@@ -14,7 +14,7 @@ Decisão arquitetural relacionada: [ADR-0006 — Stack de Observabilidade](../ad
 |---|---|---|
 | Jaeger UI | `http://localhost:16686` | Nenhuma |
 | Prometheus | `http://localhost:9090` | Nenhuma |
-| Grafana | `http://localhost:3000` | `admin` / `meli` |
+| Grafana | `http://localhost:3000` | `admin` / `logistica` |
 | Kafka UI | `http://localhost:8088` | Nenhuma |
 
 ---
@@ -68,7 +68,7 @@ builder.Services.AddOpenTelemetry()
         tracing
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource("MeliEnvios.*")
+            .AddSource("LogisticaEnvios.*")
             .SetResourceBuilder(ResourceBuilder.CreateDefault()
                 .AddService(serviceName: "shipment-service", serviceVersion: "1.0.0"))
             .AddOtlpExporter(opts =>
@@ -148,7 +148,7 @@ Com o `correlationId`, busque no Jaeger por `correlation.id=<valor>` para ver to
 
 ## Visualizar métricas no Grafana
 
-1. Acesse `http://localhost:3000` (login: `admin` / `meli`).
+1. Acesse `http://localhost:3000` (login: `admin` / `logistica`).
 2. Vá em **Explore** → selecione datasource **Prometheus**.
 3. Métricas úteis:
    - `http_server_duration_milliseconds_bucket` — latência HTTP por serviço.
