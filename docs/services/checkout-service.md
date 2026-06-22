@@ -37,7 +37,15 @@ Headers obrigatórios: `x-correlation-id`, `x-idempotency-key` (em POST/confirm)
 
 Nenhuma (fluxo de cotação é assíncrono via Kafka).
 
-Dependências de infraestrutura: Redis (cache de promessa), Postgres (persistência do checkout).
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `checkout` | Persistência de `Checkout`, `ShippingPromiseProjection`, Outbox, Inbox e idempotência |
+| Redis | Cache curto de promise e sessão de checkout |
+| Kafka | Publicação de `checkout.shipping.quote.requested` e `checkout.confirmed`; consumo de `shipping.promise.calculated` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
 ## SLOs
 
