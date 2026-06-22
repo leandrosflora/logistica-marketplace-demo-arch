@@ -59,9 +59,19 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
 
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.confirmed --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.cancelled --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.approved --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.rejected --partitions 1 --replication-factor 1
+
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.cancelled --partitions 1 --replication-factor 1
 ```
 
 ## Criar tópicos internos de saga do OrderService
@@ -86,53 +96,59 @@ Listar tópicos:
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
-## Microservices com Kafka implementado
+## Microservices com Kafka implementado ou previsto
 
 | Serviço | Producer | Consumer | Consumer group | Status |
 |---|---|---|---|---|
 | `CheckoutService` | `checkout.shipping.quote.requested`, `checkout.confirmed` | `shipping.promise.calculated` | `checkout-service` | Alinhado |
 | `ShippingPromiseService` | `shipping.promise.calculated` | `checkout.shipping.quote.requested` | `shipping-promise-service` | Alinhado |
-| `OrderService` | `order.created` e tópicos internos de saga | `checkout.confirmed`, `shipment.status.updated` | `order-service` | Alinhado |
-| `ShipmentService` | `shipment.created` | `order.created` | `shipment-service` | Alinhado |
+| `OrderService` | `order.created`, `order.confirmed`, `order.cancelled`, tópicos internos de saga | `checkout.confirmed`, `shipment.status.updated`, `payment.approved`, `payment.rejected` | `order-service` | Alinhado |
+| `PaymentService` | `payment.approved`, `payment.rejected` | `payment.commands` | `payment-service` | Alinhado |
+| `InventoryService` | - | `inventory.commands` | `inventory-service` | Saga interna |
+| `FulfillmentCenterService` | - | `fulfillment.commands` | `fulfillment-center-service` | Saga interna |
+| `ShipmentService` | `shipment.created`, `shipment.cancelled` | `order.created`, `order.cancelled`, `shipment.commands` | `shipment-service` | Alinhado |
 | `TrackingService` | `shipment.status.updated` | `shipment.created` | `tracking-service` | Alinhado |
-| `NotificationService` | - | `order.created`, `shipment.created`, `shipment.status.updated` | `notification-service` | Alinhado |
+| `NotificationService` | - | `order.created`, `order.confirmed`, `order.cancelled`, `payment.rejected`, `shipment.created`, `shipment.status.updated`, `shipment.cancelled` | `notification-service` | Alinhado |
+| `AuditService` | - | Todos os eventos canônicos auditáveis | `audit-service` | Alinhado |
 
-## Matriz final de tópicos
+## Matriz final de tópicos canônicos
 
-| Tópico | Producer | Consumers | Payload obrigatório | Status |
-|---|---|---|---|---|
-| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
-| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
-| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `items[]`, `totalAmount`, `currency`, `confirmedAt` | Alinhado |
-| `order.created` | `order-service` | `shipment-service`, `notification-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
-| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado |
-| `shipment.status.updated` | `tracking-service` | `order-service`, `notification-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
+| Tópico | Producer | Consumers | Status |
+|---|---|---|---|
+| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | Alinhado |
+| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | Alinhado |
+| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | Alinhado |
+| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | Alinhado |
+| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | Especificado |
+| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | Especificado |
+| `payment.approved` | `payment-service` | `order-service`, `audit-service` | Especificado |
+| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | Especificado |
+| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | Alinhado |
+| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | Alinhado |
+| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | Especificado |
+
+## Matriz de tópicos internos de saga
+
+| Tópico | Producer | Consumer principal | Finalidade |
+|---|---|---|---|
+| `inventory.commands` | `order-service` | `inventory-service` | Reservar, confirmar ou liberar estoque |
+| `fulfillment.commands` | `order-service` | `fulfillment-center-service` | Validar capacidade e acionar preparação logística |
+| `payment.commands` | `order-service` | `payment-service` | Autorizar, capturar, cancelar ou estornar pagamento |
+| `shipment.commands` | `order-service` | `shipment-service` | Criar, cancelar ou atualizar entrega |
+| `order.events` | `order-service` | consumidores internos controlados | Publicar mudanças internas do ciclo de vida do pedido |
 
 ## Ordem recomendada para teste por fases
 
 ### Fase 0 - Infraestrutura Kafka
 
-Objetivo:
-
 1. Subir Kafka, Kafka UI, Redis e Postgres.
-2. Criar tópicos canônicos.
-3. Criar tópicos internos de saga.
+2. Criar os 11 tópicos canônicos.
+3. Criar os 5 tópicos internos de saga.
 4. Validar tópicos no Kafka UI.
 
 ### Fase 1 - Smoke test por tópico
 
-Antes do E2E entre serviços, validar produção/consumo manual dos tópicos:
-
-```text
-checkout.shipping.quote.requested
-shipping.promise.calculated
-checkout.confirmed
-order.created
-shipment.created
-shipment.status.updated
-```
-
-Use `kafka-console-producer` e `kafka-console-consumer` para validar conectividade básica.
+Antes do E2E entre serviços, validar produção/consumo manual dos tópicos canônicos e internos com `kafka-console-producer` e `kafka-console-consumer`.
 
 Exemplo de consumo:
 
@@ -153,6 +169,7 @@ Rodar serviços:
 ```text
 CheckoutService
 ShippingPromiseService
+AuditService
 ```
 
 Tópicos:
@@ -168,30 +185,45 @@ Objetivo esperado:
 2. `ShippingPromiseService` consome `checkout.shipping.quote.requested`.
 3. `ShippingPromiseService` publica `shipping.promise.calculated` com o mesmo `checkoutId`.
 4. `CheckoutService` consome `shipping.promise.calculated` e grava/projeta a promise.
+5. `AuditService` audita os eventos canônicos.
 
-### Fase 3 - Confirmação de checkout e criação de pedido
+### Fase 3 - Confirmação de checkout, pedido e pagamento
 
 Rodar serviços:
 
 ```text
 CheckoutService
 OrderService
+InventoryService
+FulfillmentCenterService
+PaymentService
+AuditService
 ```
 
 Tópicos usados:
 
 ```text
 checkout.confirmed
+inventory.commands
+fulfillment.commands
+payment.commands
+payment.approved
+payment.rejected
 order.created
+order.confirmed
+order.cancelled
 ```
 
 Objetivo esperado:
 
 1. `CheckoutService` confirma o checkout e publica `checkout.confirmed`.
-2. `OrderService` consome `checkout.confirmed` e inicia a saga do pedido.
-3. `OrderService` publica `order.created` com dados logísticos suficientes para criação da entrega.
+2. `OrderService` consome `checkout.confirmed` e inicia a saga.
+3. `OrderService` publica comandos internos de estoque, fulfillment e pagamento.
+4. `PaymentService` publica `payment.approved` ou `payment.rejected`.
+5. `OrderService` publica `order.created` e `order.confirmed` em sucesso, ou `order.cancelled` em falha/compensação.
+6. `AuditService` audita os eventos canônicos.
 
-### Fase 4 - Pedido, shipment, tracking e notification
+### Fase 4 - Shipment, tracking e notification
 
 Rodar serviços:
 
@@ -200,23 +232,28 @@ OrderService
 ShipmentService
 TrackingService
 NotificationService
+AuditService
 ```
 
 Tópicos usados:
 
 ```text
 order.created
+order.confirmed
+order.cancelled
+shipment.commands
 shipment.created
 shipment.status.updated
+shipment.cancelled
 ```
 
 Objetivo esperado:
 
-1. `OrderService` publica `order.created` com dados logísticos suficientes para criação da entrega.
-2. `ShipmentService` consome `order.created` e publica `shipment.created` com `orderId` e `buyerId`.
-3. `TrackingService` consome `shipment.created` e publica `shipment.status.updated` com `orderId` e `buyerId`.
-4. `NotificationService` consome `order.created`, `shipment.created` e `shipment.status.updated`.
-5. `OrderService` consome `shipment.status.updated` e atualiza status de entrega no pedido.
+1. `ShipmentService` consome `order.created` ou `shipment.commands` e publica `shipment.created`.
+2. `TrackingService` consome `shipment.created` e publica `shipment.status.updated`.
+3. `NotificationService` consome eventos de pedido, pagamento e shipment.
+4. `OrderService` consome `shipment.status.updated` e atualiza status de entrega.
+5. `AuditService` audita todos os eventos canônicos.
 
 ### Fase 5 - E2E integrado
 
@@ -226,9 +263,13 @@ Rodar serviços:
 CheckoutService
 ShippingPromiseService
 OrderService
+InventoryService
+FulfillmentCenterService
+PaymentService
 ShipmentService
 TrackingService
 NotificationService
+AuditService
 ```
 
 Objetivo:
@@ -236,11 +277,13 @@ Objetivo:
 1. Criar checkout.
 2. Calcular promise assíncrona.
 3. Confirmar checkout.
-4. Criar pedido.
-5. Criar shipment.
-6. Criar tracking/status inicial.
-7. Planejar notificações.
-8. Validar mensagens no Kafka UI.
+4. Executar saga com estoque, fulfillment e pagamento.
+5. Criar pedido.
+6. Criar shipment.
+7. Criar tracking/status inicial.
+8. Planejar notificações.
+9. Auditar eventos.
+10. Validar mensagens no Kafka UI.
 
 ## Configuração esperada em appsettings.Development.json
 
@@ -251,8 +294,7 @@ Exemplo base:
   "Kafka": {
     "BootstrapServers": "localhost:9092",
     "ConsumerGroupId": "nome-do-servico",
-    "Topics": {
-    }
+    "Topics": {}
   }
 }
 ```
@@ -286,9 +328,11 @@ No Kafka UI:
    - `checkout-service`
    - `shipping-promise-service`
    - `order-service`
+   - `payment-service`
    - `shipment-service`
    - `tracking-service`
    - `notification-service`
+   - `audit-service`
 
 ## Resetar ambiente
 
