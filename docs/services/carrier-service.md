@@ -30,6 +30,16 @@ Nenhum.
 |---|---|
 | APIs externas de transportadoras | Consultar disponibilidade real-time (via circuit breaker) |
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `carrier` | Persistência de transportadoras, níveis de serviço, restrições e disponibilidade materializada |
+| Redis | Cache de disponibilidade e restrições de transportadora |
+| Kafka | Não utilizado diretamente no escopo atual |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
