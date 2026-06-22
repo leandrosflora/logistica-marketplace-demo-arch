@@ -9,65 +9,60 @@ scrape_configs:
 
   - job_name: 'checkout-service'
     static_configs:
-      - targets: ['host.docker.internal:5001']
+      - targets: ['host.docker.internal:5297']
     metrics_path: /metrics
 
   - job_name: 'shipping-promise-service'
     static_configs:
-      - targets: ['host.docker.internal:5002']
+      - targets: ['host.docker.internal:5237']
     metrics_path: /metrics
 
   - job_name: 'order-service'
     static_configs:
-      - targets: ['host.docker.internal:5003']
+      - targets: ['host.docker.internal:5279']
     metrics_path: /metrics
 
   - job_name: 'shipment-service'
     static_configs:
-      - targets: ['host.docker.internal:5004']
+      - targets: ['host.docker.internal:5194']
     metrics_path: /metrics
 
   - job_name: 'tracking-service'
     static_configs:
-      - targets: ['host.docker.internal:5005']
+      - targets: ['host.docker.internal:5200']
     metrics_path: /metrics
 
   - job_name: 'notification-service'
     static_configs:
-      - targets: ['host.docker.internal:5006']
+      - targets: ['host.docker.internal:5206']
     metrics_path: /metrics
 
   - job_name: 'inventory-service'
     static_configs:
-      - targets: ['host.docker.internal:5007']
+      - targets: ['host.docker.internal:5168']
     metrics_path: /metrics
 
   - job_name: 'fulfillment-center-service'
     static_configs:
-      - targets: ['host.docker.internal:5008']
+      - targets: ['host.docker.internal:5039']
     metrics_path: /metrics
 
   - job_name: 'routing-service'
     static_configs:
-      - targets: ['host.docker.internal:5009']
+      - targets: ['host.docker.internal:5099']
     metrics_path: /metrics
 
   - job_name: 'carrier-service'
     static_configs:
-      - targets: ['host.docker.internal:5010']
+      - targets: ['host.docker.internal:5247']
     metrics_path: /metrics
 
   - job_name: 'shipping-pricing-service'
     static_configs:
-      - targets: ['host.docker.internal:5011']
+      - targets: ['host.docker.internal:5197']
     metrics_path: /metrics
 
   - job_name: 'product-catalog-service'
     static_configs:
-      - targets: ['host.docker.internal:5012']
-    metrics_path: /metrics
-
-  - job_name: 'audit-service'
-    static_configs:
-      - targets: ['host.docker.internal:5013']
+      - targets: ['host.docker.internal:5009']
     metrics_path: /metrics
