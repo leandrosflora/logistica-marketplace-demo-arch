@@ -38,6 +38,16 @@ Calcula prazo, disponibilidade, modalidade e custo de entrega para um conjunto d
 | Carrier Service | Opções de transportadora e restrições |
 | Shipping Pricing Service | Custo de frete e subsídios |
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `shipping_promise` | Persistência de promises calculadas, snapshots de composição, Inbox e Outbox |
+| Redis | Cache de promise, rota, catálogo e pricing |
+| Kafka | Consumo de `checkout.shipping.quote.requested` e publicação de `shipping.promise.calculated` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
