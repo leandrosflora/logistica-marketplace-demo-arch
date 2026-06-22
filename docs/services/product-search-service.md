@@ -27,6 +27,16 @@ Nenhum diretamente. O índice de produtos pode ser alimentado por eventos de dom
 
 Nenhuma direta (índice local).
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `product_search` | Persistência do índice materializado e metadados de indexação |
+| Redis | Cache opcional de consultas frequentes e facetas |
+| Kafka | Não utilizado diretamente no escopo atual |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
