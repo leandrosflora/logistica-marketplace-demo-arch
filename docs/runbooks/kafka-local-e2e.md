@@ -6,9 +6,29 @@ Executar e validar localmente a comunicação Kafka entre os microservices do ca
 
 ## Status atual
 
-Status: **pronto para validação E2E local por fases**.
+Status: **implementação de consumers e outbox concluída — pronto para validação E2E local por fases**.
 
-Os contratos Kafka canônicos foram alinhados entre os microservices avaliados. A validação final ainda depende de execução local/CI com .NET 8, Docker, Postgres, Redis e Kafka.
+### O que está implementado neste monorepo
+
+| Serviço | Consumer Kafka | OutboxDispatcher | schema.sql |
+|---|---|---|---|
+| `CheckoutService` | `ShippingPromiseCalculatedConsumer` | `OutboxKafkaDispatcher` | Adicionado |
+| `ShippingPromiseService` | consumer existente | dispatcher existente | Existente |
+| `OrderService` | `CheckoutConfirmedConsumer`, `InventoryReservedConsumer`, `InventoryReservationFailedConsumer`, `FulfillmentCapacityReservedConsumer`, `FulfillmentCapacityFailedConsumer`, `ShipmentCreatedConsumer`, `ShipmentStatusUpdatedConsumer` | `OutboxDispatcher` | Existente |
+| `InventoryService` | `InventoryCommandsConsumer` | `OutboxDispatcher` | Existente |
+| `FulfillmentCenterService` | `FulfillmentCommandsConsumer` | `OutboxDispatcher` | Adicionado |
+| `ShipmentService` | `OrderCreatedKafkaConsumer`, `ShipmentCommandsConsumer` | `OutboxDispatcher` | Existente |
+| `TrackingService` | consumer existente | dispatcher existente | Adicionado |
+| `NotificationService` | `KafkaNotificationConsumer` | `OutboxDispatcher` | Adicionado |
+
+### O que NÃO está disponível localmente
+
+| Serviço ausente | Impacto | Solução para E2E local |
+|---|---|---|
+| `PaymentService` | Saga fica bloqueada aguardando `payment.authorized` | Simular manualmente via Kafka UI (ver Fase 3) |
+| `AuditService` | Sem auditoria de eventos | Ignorar para E2E funcional |
+
+A validação final depende de execução local com .NET 8, Docker, Postgres, Redis e Kafka.
 
 Revisão relacionada: [`docs/reviews/kafka-e2e-contract-review-2026-06-14.md`](../reviews/kafka-e2e-contract-review-2026-06-14.md).
 
@@ -25,6 +45,29 @@ Contrato canônico: [`docs/contracts/kafka-events.md`](../contracts/kafka-events
 | Postgres local | `localhost:5432` |
 
 Importante: `http://localhost:8088` é apenas a interface web do Kafka UI. Microservices não devem apontar para `8088`; devem usar `localhost:9092` quando rodando fora do Docker.
+
+## Pré-requisitos: aplicar schemas SQL
+
+Após subir o Postgres (`docker compose up -d`), aplique os schemas de cada serviço.
+
+O banco é `logistica_envios`, usuário `logistica`, senha `logistica`, porta `5432`.
+
+```bash
+# Variável de conexão (reutilize nos comandos abaixo)
+PGCONN="postgresql://logistica:logistica@localhost:5432/logistica_envios"
+
+# Aplicar schemas
+psql "$PGCONN" -f CheckoutService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f ShippingPromiseService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f OrderService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f InventoryService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f FulfillmentCenterService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f ShipmentService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f TrackingService/Infrastructure/Persistence/schema.sql
+psql "$PGCONN" -f NotificationService/Infrastructure/Persistence/schema.sql
+```
+
+> **Nota**: Os schemas são idempotentes somente na primeira execução. Se precisar re-aplicar, rode `DROP TABLE ... CASCADE` nas tabelas ou recrie o banco com `docker compose down -v && docker compose up -d`.
 
 ## Subir infraestrutura
 
@@ -90,26 +133,46 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
 ```
 
+### Tópicos de resposta da saga (inventory/fulfillment)
+
+Esses tópicos são usados pelo `InventoryService` e `FulfillmentCenterService` para responder ao `OrderService` via outbox.
+
+```bash
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.reserved --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.reservation.confirmed --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.reservation.failed --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.reservation.released --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.reserved --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.confirmed --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.failed --partitions 1 --replication-factor 1
+```
+
 Listar tópicos:
 
 ```bash
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
-## Microservices com Kafka implementado ou previsto
+## Microservices com Kafka implementado
 
-| Serviço | Producer | Consumer | Consumer group | Status |
+| Serviço | Producer (via outbox) | Consumer(s) implementado(s) | Consumer group | Status |
 |---|---|---|---|---|
-| `CheckoutService` | `checkout.shipping.quote.requested`, `checkout.confirmed` | `shipping.promise.calculated` | `checkout-service` | Alinhado |
-| `ShippingPromiseService` | `shipping.promise.calculated` | `checkout.shipping.quote.requested` | `shipping-promise-service` | Alinhado |
-| `OrderService` | `order.created`, `order.confirmed`, `order.cancelled`, tópicos internos de saga | `checkout.confirmed`, `shipment.status.updated`, `payment.approved`, `payment.rejected` | `order-service` | Alinhado |
-| `PaymentService` | `payment.approved`, `payment.rejected` | `payment.commands` | `payment-service` | Alinhado |
-| `InventoryService` | - | `inventory.commands` | `inventory-service` | Saga interna |
-| `FulfillmentCenterService` | - | `fulfillment.commands` | `fulfillment-center-service` | Saga interna |
-| `ShipmentService` | `shipment.created`, `shipment.cancelled` | `order.created`, `order.cancelled`, `shipment.commands` | `shipment-service` | Alinhado |
-| `TrackingService` | `shipment.status.updated` | `shipment.created` | `tracking-service` | Alinhado |
-| `NotificationService` | - | `order.created`, `order.confirmed`, `order.cancelled`, `payment.rejected`, `shipment.created`, `shipment.status.updated`, `shipment.cancelled` | `notification-service` | Alinhado |
-| `AuditService` | - | Todos os eventos canônicos auditáveis | `audit-service` | Alinhado |
+| `CheckoutService` | `checkout.shipping.quote.requested`, `checkout.confirmed` | `ShippingPromiseCalculatedConsumer` | `checkout-service` | **Implementado** |
+| `ShippingPromiseService` | `shipping.promise.calculated` | consumer de `checkout.shipping.quote.requested` | `shipping-promise-service` | **Implementado** |
+| `OrderService` | `order.created`, tópicos internos de saga | `CheckoutConfirmedConsumer`, `InventoryReservedConsumer`, `InventoryReservationFailedConsumer`, `FulfillmentCapacityReservedConsumer`, `FulfillmentCapacityFailedConsumer`, `ShipmentCreatedConsumer`, `ShipmentStatusUpdatedConsumer` | `order-service` | **Implementado** |
+| `InventoryService` | `inventory.reserved`, `inventory.reservation.confirmed`, `inventory.reservation.failed`, `inventory.reservation.released` | `InventoryCommandsConsumer` | `inventory-service` | **Implementado** |
+| `FulfillmentCenterService` | `fulfillment.capacity.reserved`, `fulfillment.capacity.confirmed`, `fulfillment.capacity.failed` | `FulfillmentCommandsConsumer` | `fulfillment-center-service` | **Implementado** |
+| `ShipmentService` | `shipment.created` | `OrderCreatedKafkaConsumer`, `ShipmentCommandsConsumer` | `shipment-service` | **Implementado** |
+| `TrackingService` | `shipment.status.updated` | consumer de `shipment.created` | `tracking-service` | **Implementado** |
+| `NotificationService` | — | `KafkaNotificationConsumer` (múltiplos tópicos) | `notification-service` | **Implementado** |
+| `PaymentService` | `payment.approved`, `payment.rejected` | `payment.commands` | `payment-service` | **Ausente** — simular manualmente |
+| `AuditService` | — | Todos os eventos canônicos | `audit-service` | **Ausente** — ignorar para E2E local |
 
 ## Matriz final de tópicos canônicos
 
@@ -132,7 +195,14 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 | Tópico | Producer | Consumer principal | Finalidade |
 |---|---|---|---|
 | `inventory.commands` | `order-service` | `inventory-service` | Reservar, confirmar ou liberar estoque |
+| `inventory.reserved` | `inventory-service` | `order-service` | Confirma reserva de estoque bem-sucedida |
+| `inventory.reservation.confirmed` | `inventory-service` | `order-service` | Confirma que reserva foi efetivada após pagamento autorizado |
+| `inventory.reservation.failed` | `inventory-service` | `order-service` | Falha na reserva — dispara compensação na saga |
+| `inventory.reservation.released` | `inventory-service` | `order-service` | Estoque liberado após compensação |
 | `fulfillment.commands` | `order-service` | `fulfillment-center-service` | Validar capacidade e acionar preparação logística |
+| `fulfillment.capacity.reserved` | `fulfillment-center-service` | `order-service` | Confirma reserva de capacidade bem-sucedida |
+| `fulfillment.capacity.confirmed` | `fulfillment-center-service` | `order-service` | Capacidade efetivada após pagamento autorizado |
+| `fulfillment.capacity.failed` | `fulfillment-center-service` | `order-service` | Falha na reserva de capacidade — dispara compensação |
 | `payment.commands` | `order-service` | `payment-service` | Autorizar, capturar, cancelar ou estornar pagamento |
 | `shipment.commands` | `order-service` | `shipment-service` | Criar, cancelar ou atualizar entrega |
 | `order.events` | `order-service` | consumidores internos controlados | Publicar mudanças internas do ciclo de vida do pedido |
@@ -187,7 +257,9 @@ Objetivo esperado:
 4. `CheckoutService` consome `shipping.promise.calculated` e grava/projeta a promise.
 5. `AuditService` audita os eventos canônicos.
 
-### Fase 3 - Confirmação de checkout, pedido e pagamento
+### Fase 3 - Confirmação de checkout, pedido e pagamento (sem PaymentService)
+
+> `PaymentService` não está disponível neste monorepo. O `payment.commands` será publicado pelo `OrderService` mas não terá consumidor. Simule `payment.authorized` manualmente conforme instruções abaixo.
 
 Rodar serviços:
 
@@ -196,8 +268,6 @@ CheckoutService
 OrderService
 InventoryService
 FulfillmentCenterService
-PaymentService
-AuditService
 ```
 
 Tópicos usados:
@@ -205,23 +275,58 @@ Tópicos usados:
 ```text
 checkout.confirmed
 inventory.commands
+inventory.reserved
+inventory.reservation.confirmed
+inventory.reservation.failed
 fulfillment.commands
+fulfillment.capacity.reserved
+fulfillment.capacity.confirmed
+fulfillment.capacity.failed
 payment.commands
-payment.approved
-payment.rejected
 order.created
-order.confirmed
-order.cancelled
 ```
 
 Objetivo esperado:
 
 1. `CheckoutService` confirma o checkout e publica `checkout.confirmed`.
-2. `OrderService` consome `checkout.confirmed` e inicia a saga.
-3. `OrderService` publica comandos internos de estoque, fulfillment e pagamento.
-4. `PaymentService` publica `payment.approved` ou `payment.rejected`.
-5. `OrderService` publica `order.created` e `order.confirmed` em sucesso, ou `order.cancelled` em falha/compensação.
-6. `AuditService` audita os eventos canônicos.
+2. `OrderService` consome `checkout.confirmed`, cria o pedido e publica:
+   - `order.created` (para `ShipmentService`)
+   - `inventory.commands` (para `InventoryService`)
+   - `fulfillment.commands` (para `FulfillmentCenterService`)
+3. `InventoryService` reserva estoque e publica `inventory.reserved`.
+4. `FulfillmentCenterService` reserva capacidade e publica `fulfillment.capacity.reserved`.
+5. `OrderService` recebe ambas as reservas e publica `payment.commands` (sem consumidor).
+
+#### Simulação manual de payment.authorized
+
+Após o `OrderService` publicar `payment.commands`, simule o `PaymentService` publicando `payment.authorized` manualmente:
+
+Via `kafka-console-producer`:
+
+```bash
+docker exec -it logistica-envios-kafka kafka-console-producer \
+  --bootstrap-server localhost:9092 \
+  --topic payment.approved
+```
+
+Cole o JSON abaixo (substitua `<ORDER_ID>` pelo ID real do pedido — veja no log do `OrderService` ou no Kafka UI no tópico `payment.commands`):
+
+```json
+{"eventId":"00000000-0000-0000-0000-000000000001","eventType":"payment.approved","schemaVersion":"1.0","occurredAt":"2026-06-22T00:00:00Z","correlationId":"manual-sim","producer":"payment-service-manual","payload":{"messageId":"00000000-0000-0000-0000-000000000002","orderId":"<ORDER_ID>","paymentAuthorizationId":"00000000-0000-0000-0000-000000000003"}}
+```
+
+Via Kafka UI (`http://localhost:8088`):
+
+1. Acesse o cluster → Topics → `payment.approved`.
+2. Clique em **Produce Message**.
+3. Cole o JSON acima no campo **Value** com o `ORDER_ID` correto.
+4. Clique em **Produce**.
+
+Após a simulação:
+
+6. `OrderService` recebe `payment.approved` e publica `inventory.commands` (confirmar) + `fulfillment.commands` (confirmar).
+7. Ambos os serviços confirmam e publicam `inventory.reservation.confirmed` e `fulfillment.capacity.confirmed`.
+8. `OrderService` recebe ambas as confirmações e publica `shipment.commands`.
 
 ### Fase 4 - Shipment, tracking e notification
 
