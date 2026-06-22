@@ -27,7 +27,7 @@ Headers obrigatórios: `x-correlation-id`, `x-idempotency-key` (em POST), `Autho
 | `payment.approved` | Autorização aprovada pelo provedor externo | [kafka-events.md](../contracts/kafka-events.md#paymentapproved) |
 | `payment.rejected` | Autorização rejeitada ou timeout com provedor | [kafka-events.md](../contracts/kafka-events.md#paymentrejected) |
 
-Ambos os eventos são publicados via **Outbox Pattern** para garantir entrega even-once ao Kafka.
+Ambos os eventos são publicados via **Outbox Pattern** para garantir entrega ao Kafka.
 
 ## Eventos Kafka consumidos
 
@@ -41,6 +41,16 @@ Ambos os eventos são publicados via **Outbox Pattern** para garantir entrega ev
 |---|---|
 | MercadoPago API | Autorização e captura de pagamentos (Pix, cartão de crédito/débito) |
 | Provedores de bandeira (Visa, Mastercard) | Processamento de cartões internacionais |
+
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `payment` | Persistência de `PaymentAuthorization`, `PaymentCapture`, `Refund`, Inbox, Outbox e idempotência |
+| Redis | Cache curto de idempotência e proteção contra retry duplicado quando aplicável |
+| Kafka | Consumo de `payment.commands` e publicação de `payment.approved` / `payment.rejected` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
 ## SLOs
 

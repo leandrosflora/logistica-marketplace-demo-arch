@@ -29,6 +29,16 @@ Nenhum.
 
 Nenhuma (fonte de dados proprietária).
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `product_catalog` | Persistência de atributos logísticos de produto, dimensões, peso e restrições |
+| Redis | Cache de atributos logísticos por SKU |
+| Kafka | Não utilizado diretamente no escopo atual |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |

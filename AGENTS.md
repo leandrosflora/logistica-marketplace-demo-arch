@@ -10,6 +10,7 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
 - responsabilidades e specs individuais por serviço;
 - contratos REST;
 - eventos Kafka e schema governance;
+- ownership de bancos, schemas, cache, Inbox e Outbox;
 - diagramas C4;
 - decisões arquiteturais (ADRs);
 - glossário de domínio;
@@ -23,6 +24,7 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
 1. Antes de gerar código, leia:
    - `README.md`
    - `docs/contracts/services-map.md`
+   - `docs/contracts/data-stores.md` — ownership de banco/schema/cache e padrões Inbox/Outbox
    - `docs/contracts/kafka-events.md`
    - `docs/adr/*.md`
    - `docs/glossary/domain-glossary.md` — termos do domínio de logística e envios
@@ -32,6 +34,7 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
 2. Não alterar contratos sem atualizar:
    - documentação do serviço afetado;
    - evento Kafka relacionado, se existir;
+   - `docs/contracts/data-stores.md`, se houver mudança de banco, schema, cache, Inbox ou Outbox;
    - ADR, se houver mudança arquitetural relevante;
    - `docs/contracts/kafka-schema-governance.md` ao evoluir schemas Kafka (leia antes de implementar consumers ou producers Kafka).
 
@@ -40,7 +43,8 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
    - boundaries;
    - dados que domina;
    - APIs expostas;
-   - eventos publicados/consumidos.
+   - eventos publicados/consumidos;
+   - schema/banco/cache que utiliza.
 
 4. Preferir implementação em:
    - .NET 8;
@@ -52,6 +56,7 @@ Este repositório é a fonte de contexto arquitetural do case **Logística Envio
 
 5. Padrões obrigatórios:
    - idempotência em comandos críticos (Inbox/Outbox Pattern — ver [ADR-0005](docs/adr/0005-idempotency-strategy.md));
+   - ownership de dados por microservice (ver [data-stores.md](docs/contracts/data-stores.md));
    - correlationId em APIs e eventos (ver [docs/security/security-architecture.md](docs/security/security-architecture.md));
    - observabilidade com logs estruturados, métricas e traces via OpenTelemetry (ver [ADR-0006](docs/adr/0006-observability-stack.md));
    - fallback para dependências externas;

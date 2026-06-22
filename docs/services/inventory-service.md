@@ -34,6 +34,16 @@ Nenhum canônico neste momento. Responde a `inventory.commands` (tópico interno
 
 Nenhuma.
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `inventory` | Persistência de `InventoryBalance`, `InventoryReservation` e Inbox |
+| Redis | Cache opcional de disponibilidade por SKU/seller/FC |
+| Kafka | Consumo de `inventory.commands` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |

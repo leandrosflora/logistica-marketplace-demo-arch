@@ -37,6 +37,16 @@ Nenhum (serviço de saída pura — não publica eventos canônicos).
 |---|---|
 | Provedores de notificação externos | Email (SMTP/SES), Push (FCM/APNs), SMS |
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `notification` | Persistência de `NotificationPlan`, `NotificationLog`, preferências materializadas e Inbox |
+| Redis | Cache opcional de preferências e canais de notificação |
+| Kafka | Consumo de eventos de pedido, pagamento e shipment |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |

@@ -30,6 +30,16 @@ Nenhum.
 
 Nenhuma (dados proprietários de malha logística).
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `routing` | Persistência de `LogisticNetwork`, hubs, lanes e rotas calculadas |
+| Redis | Cache de rotas e SLA por origem/destino/modalidade |
+| Kafka | Não utilizado diretamente no escopo atual |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |

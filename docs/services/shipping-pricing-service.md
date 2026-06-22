@@ -27,6 +27,16 @@ Nenhum.
 
 Nenhuma direta (regras de negócio proprietárias).
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `shipping_pricing` | Persistência de `FreightPrice`, `RateCard`, `SubsidyRule` e promoções |
+| Redis | Cache de regras de subsídio, rate cards e cotações recentes |
+| Kafka | Não utilizado diretamente no escopo atual |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |

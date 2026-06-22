@@ -2,7 +2,7 @@
 
 Repositório de arquitetura para estudo do case **Logística de Envios** (versão demo).
 
-Objetivo: dar contexto suficiente para o Codex entender o domínio, os microservices, os contratos, os eventos Kafka, os diagramas C4, as decisões arquiteturais e os comandos de validação local.
+Objetivo: dar contexto suficiente para o Codex entender o domínio, os microservices, os contratos, os eventos Kafka, os diagramas C4, as decisões arquiteturais, os bancos de dados e os comandos de validação local.
 
 ## Licença
 
@@ -12,7 +12,7 @@ Este repositório está licenciado sob a **Apache License 2.0**. Consulte o arqu
 
 Status: **pronto para validação E2E local por fases**.
 
-Os contratos Kafka canônicos foram alinhados entre os microservices principais. A execução final ainda deve ser validada localmente ou em CI com:
+Os contratos Kafka canônicos, os tópicos internos de saga, o mapa de microservices e a matriz de dados estão alinhados. A execução final ainda deve ser validada localmente ou em CI com:
 
 ```bash
 dotnet restore
@@ -29,7 +29,7 @@ logistica-envios-demo-arch
 │   ├── adr/                    # Decisões arquiteturais
 │   ├── c4/                     # Diagramas C4 (PlantUML + SVG)
 │   ├── cicd/                   # Pipeline CI/CD
-│   ├── contracts/              # Contratos REST, Kafka e schema governance
+│   ├── contracts/              # Contratos REST, Kafka, dados e schema governance
 │   ├── glossary/               # Glossário de domínio
 │   ├── prompts/                # Prompts para Codex
 │   ├── reviews/                # Reviews de contratos e PRs
@@ -45,7 +45,7 @@ logistica-envios-demo-arch
 
 ## Domínio
 
-Este case modela uma plataforma de cálculo de frete, promessa de entrega, disponibilidade logística, criação de shipment, rastreio e notificação para milhões de pedidos por dia.
+Este case modela uma plataforma de cálculo de frete, promessa de entrega, disponibilidade logística, criação de shipment, pagamento, rastreio, notificação e auditoria para milhões de pedidos por dia.
 
 ## Repositórios envolvidos
 
@@ -70,9 +70,11 @@ Este case modela uma plataforma de cálculo de frete, promessa de entrega, dispo
 | Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Integra transportadoras, Correios, parceiros e restrições. |
 | Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) | Calcula frete, custo logístico, subsídio e promoções. |
 | Order Service | [OrderService](https://github.com/leandrosflora/OrderService) | Cria e mantém o pedido após confirmação da compra. |
+| Payment Service | [PaymentService](https://github.com/leandrosflora/PaymentService) | Autoriza, captura e estorna pagamentos durante a saga do pedido. |
 | Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria a entrega física, etiqueta, volume, pacote e despacho. |
 | Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Atualiza status de entrega, eventos de transporte e rastreio. |
 | Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Notifica comprador e seller sobre alterações relevantes. |
+| Audit Service | [AuditService](https://github.com/leandrosflora/AuditService) | Mantém trilha imutável de auditoria dos eventos canônicos. |
 
 ## Specs de serviços
 
@@ -90,6 +92,7 @@ Documentação detalhada por microservice em [`docs/services/`](docs/services/).
 | Carrier Service | Integra transportadoras, Correios, parceiros e restrições. | [spec](docs/services/carrier-service.md) |
 | Shipping Pricing Service | Calcula frete, custo logístico, subsídio e promoções. | [spec](docs/services/shipping-pricing-service.md) |
 | Order Service | Cria e mantém o pedido após confirmação da compra. | [spec](docs/services/order-service.md) |
+| Payment Service | Autoriza, captura e estorna pagamentos. | [spec](docs/services/payment-service.md) |
 | Shipment Service | Cria a entrega física, etiqueta, volume e pacote. | [spec](docs/services/shipment-service.md) |
 | Tracking Service | Atualiza status de entrega e eventos de rastreio. | [spec](docs/services/tracking-service.md) |
 | Notification Service | Notifica comprador e seller sobre alterações relevantes. | [spec](docs/services/notification-service.md) |
@@ -111,20 +114,37 @@ Revisão de alinhamento em [`docs/reviews/kafka-e2e-contract-review-2026-06-14.m
 | `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | Alinhado |
 | `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | Alinhado |
 | `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | Alinhado |
+| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | Especificado |
+| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | Especificado |
+| `payment.approved` | `payment-service` | `order-service`, `audit-service` | Especificado |
+| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | Especificado |
 | `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | Alinhado |
 | `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | Alinhado |
+| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | Especificado |
 
 ### Tópicos internos de saga do OrderService
 
 Decisão documentada em [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md).
 
-| Tópico | Tipo | Finalidade |
-|---|---|---|
-| `inventory.commands` | Command | Reservar, confirmar ou liberar estoque durante a saga do pedido. |
-| `fulfillment.commands` | Command | Validar capacidade operacional e acionar preparação logística. |
-| `payment.commands` | Command | Solicitar autorização, captura ou cancelamento de pagamento. |
-| `shipment.commands` | Command | Solicitar criação, cancelamento ou atualização da entrega. |
-| `order.events` | Internal Event | Publicar mudanças internas do ciclo de vida do pedido. |
+| Tópico | Tipo | Producer | Consumer principal | Finalidade |
+|---|---|---|---|---|
+| `inventory.commands` | Command | `order-service` | `inventory-service` | Reservar, confirmar ou liberar estoque durante a saga do pedido. |
+| `fulfillment.commands` | Command | `order-service` | `fulfillment-center-service` | Validar capacidade operacional e acionar preparação logística. |
+| `payment.commands` | Command | `order-service` | `payment-service` | Solicitar autorização, captura ou cancelamento de pagamento. |
+| `shipment.commands` | Command | `order-service` | `shipment-service` | Solicitar criação, cancelamento ou atualização da entrega. |
+| `order.events` | Internal Event | `order-service` | Consumidores internos controlados | Publicar mudanças internas do ciclo de vida do pedido. |
+
+## Dados e bancos
+
+Matriz canônica em [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md).
+
+| Recurso | Convenção |
+|---|---|
+| Postgres local | Banco `logistica_envios` com um schema por microservice |
+| Redis | Cache compartilhado local com prefixo por serviço |
+| Kafka | Eventos canônicos e comandos internos de saga |
+| Outbox | `<schema>.outbox_messages` para producers canônicos |
+| Inbox | `<schema>.inbox_messages` para consumers Kafka |
 
 ## Fluxos principais
 
@@ -138,22 +158,29 @@ CheckoutService
   -> CheckoutService
 ```
 
-### Pedido, shipment, tracking e notification
+### Pedido, pagamento, shipment, tracking e notification
 
 ```text
-OrderService
-  -> order.created
-  -> ShipmentService
-  -> shipment.created
+CheckoutService
+  -> checkout.confirmed
+  -> OrderService
+  -> payment.commands
+  -> PaymentService
+  -> payment.approved/payment.rejected
+  -> OrderService
+  -> order.created/order.confirmed/order.cancelled
+  -> ShipmentService / NotificationService / AuditService
+  -> shipment.created/shipment.cancelled
   -> TrackingService
   -> shipment.status.updated
-  -> OrderService / NotificationService
+  -> OrderService / NotificationService / AuditService
 ```
 
 ## Contratos
 
 - [`docs/contracts/README.md`](docs/contracts/README.md)
 - [`docs/contracts/services-map.md`](docs/contracts/services-map.md)
+- [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md)
 - [`docs/contracts/logistica-envios-apis.openapi.yaml`](docs/contracts/logistica-envios-apis.openapi.yaml)
 - [`docs/contracts/api-contract-validation.md`](docs/contracts/api-contract-validation.md)
 - [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md)
@@ -216,41 +243,15 @@ docker compose up -d
 docker compose ps
 ```
 
-### Criar tópicos canônicos
+### Criar tópicos Kafka
 
-```bash
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.shipping.quote.requested --partitions 1 --replication-factor 1
+Use o runbook completo:
 
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipping.promise.calculated --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic checkout.confirmed --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.created --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.created --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.status.updated --partitions 1 --replication-factor 1
+```text
+docs/runbooks/kafka-local-e2e.md
 ```
 
-### Criar tópicos internos de saga
-
-```bash
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic inventory.commands --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.commands --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1
-
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic order.events --partitions 1 --replication-factor 1
-```
-
-### Listar tópicos
-
-```bash
-docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --list
-```
+Ele cria os 11 tópicos canônicos e os 5 tópicos internos de saga.
 
 ### Kafka UI
 
@@ -297,6 +298,7 @@ Respeite o contrato canônico em docs/contracts/kafka-events.md e valide o fluxo
 ## DevOps
 
 Documentação de CI/CD, qualidade, segurança e observabilidade do projeto:
+
 - docs/devops/ci-cd.md
 - docs/devops/security.md
 - docs/devops/observability.md

@@ -13,9 +13,9 @@
 | Routing Service | Domínio roteirização | rotas e malha | origem, destino, modalidade | rota e SLA |
 | Carrier Service | Integração | transportadoras e restrições | rota, CEP, pacote | opções de carrier |
 | Shipping Pricing Service | Domínio precificação | custo, frete, subsídio | rota, carrier, pacote | preço de frete |
-| Order Service | Domínio pedido | pedido confirmado | checkout confirmado | pedido |
-| Payment Service | Domínio pagamento | autorização e captura de pagamento | comando de saga (`payment.commands`) | `payment.approved` / `payment.rejected` |
-| Shipment Service | Domínio entrega | shipment, volume, etiqueta | order created | shipment |
+| Order Service | Domínio pedido | pedido confirmado e estado da saga | checkout confirmado | pedido e eventos de pedido |
+| Payment Service | Domínio pagamento | autorização, captura e estorno | payment.commands | payment.approved / payment.rejected |
+| Shipment Service | Domínio entrega | shipment, volume, etiqueta | order created / shipment.commands | shipment |
 | Tracking Service | Domínio tracking | status de entrega | eventos de carrier/shipment | linha do tempo |
 | Notification Service | Plataforma | notificações | eventos de domínio | mensagens ao cliente |
 | Audit Service | Plataforma | trilhas de auditoria | eventos técnicos e funcionais | auditoria consultável |
@@ -38,9 +38,19 @@
 
 1. Checkout Service publica `checkout.confirmed` após confirmação do buyer.
 2. Order Service consome `checkout.confirmed` e inicia a saga de criação de pedido.
-3. Order Service publica `order.created` ao concluir a saga com sucesso.
-4. Shipment Service consome `order.created` e cria o shipment físico.
-5. Shipment Service publica `shipment.created`.
-6. Tracking Service acompanha eventos de atualização.
-7. Notification Service notifica comprador/seller.
-8. Audit Service persiste rastreabilidade.
+3. Order Service publica comandos internos da saga:
+   - `inventory.commands` para Inventory Service;
+   - `fulfillment.commands` para Fulfillment Center Service;
+   - `payment.commands` para Payment Service;
+   - `shipment.commands` para Shipment Service.
+4. Payment Service publica `payment.approved` ou `payment.rejected`.
+5. Order Service publica `order.created`, `order.confirmed` ou `order.cancelled` conforme resultado da saga.
+6. Shipment Service consome `order.created` ou `shipment.commands` e cria o shipment físico.
+7. Shipment Service publica `shipment.created` ou `shipment.cancelled`.
+8. Tracking Service acompanha eventos de atualização e publica `shipment.status.updated`.
+9. Notification Service notifica comprador/seller.
+10. Audit Service persiste rastreabilidade.
+
+## Dados e infraestrutura
+
+A matriz de bancos, schemas, caches e padrões Inbox/Outbox fica em [`data-stores.md`](data-stores.md).

@@ -36,6 +36,16 @@ Acompanha e processa eventos de rastreio de entrega, mantém a linha do tempo de
 |---|---|
 | APIs de transportadoras (polling ou webhook) | Receber eventos de rastreio externo |
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `tracking` | Persistência de `TrackingTimeline`, `TrackingStatus`, Inbox e Outbox |
+| Redis | Cache opcional de consulta pública por `trackingCode` |
+| Kafka | Consumo de `shipment.created` e publicação de `shipment.status.updated` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
