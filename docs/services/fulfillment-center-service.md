@@ -30,6 +30,16 @@ Nenhum canônico. Responde a `fulfillment.commands` (tópico interno de saga).
 
 Nenhuma.
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `fulfillment` | Persistência de `FulfillmentCenter`, `CapacityWindow`, reservas de capacidade e Inbox |
+| Redis | Cache opcional de capacidade e cutoff |
+| Kafka | Consumo de `fulfillment.commands` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
