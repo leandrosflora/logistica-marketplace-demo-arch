@@ -25,6 +25,7 @@ Nenhum.
 |---|---|---|
 | `checkout.shipping.quote.requested` | `audit-service` | Auditar solicitação de cotação |
 | `shipping.promise.calculated` | `audit-service` | Auditar promessa calculada |
+| `checkout.confirmed` | `audit-service` | Auditar confirmação de checkout |
 | `order.created` | `audit-service` | Auditar criação de pedido |
 | `order.confirmed` | `audit-service` | Auditar confirmação de pedido |
 | `order.cancelled` | `audit-service` | Auditar cancelamento de pedido |
@@ -37,6 +38,16 @@ Nenhum.
 ## Dependências síncronas
 
 Nenhuma.
+
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `audit` | Persistência imutável de `AuditEntry` e Inbox de eventos auditados |
+| Redis | Não utilizado por padrão; consultas de auditoria devem priorizar consistência |
+| Kafka | Consumo de todos os eventos canônicos auditáveis |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
 ## SLOs
 
