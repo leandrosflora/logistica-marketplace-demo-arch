@@ -13,8 +13,12 @@ Gerencia capacidade operacional, horários de cutoff e disponibilidade dos centr
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `GET` | `/v1/fulfillment-centers/{fcId}/capacity` | Consulta capacidade e cutoff do FC |
-| `GET` | `/v1/fulfillment-centers/{fcId}/availability` | Verifica disponibilidade operacional para uma janela |
+| `POST` | `/v1/fulfillment-centers/candidates/search` | Busca FCs candidatos para origem de um pedido (usado pelo Shipping Promise Service) |
+| `GET` | `/v1/fulfillment-centers/{fulfillmentCenterId}/capacity` | Consulta capacidade e cutoff do FC |
+| `GET` | `/v1/fulfillment-centers/{fulfillmentCenterId}/status` | Verifica status operacional atual do FC |
+| `POST` | `/v1/capacity-reservations` | Cria reserva de capacidade operacional no FC (saga de pedido) |
+| `POST` | `/v1/capacity-reservations/{reservationId}/confirm` | Confirma reserva de capacidade |
+| `POST` | `/v1/capacity-reservations/{reservationId}/release` | Libera reserva de capacidade (compensação de saga) |
 
 ## Eventos Kafka publicados
 

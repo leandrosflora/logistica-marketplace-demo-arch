@@ -13,8 +13,13 @@ Integra transportadoras (Correios, parceiros privados, last-mile), consulta opç
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `POST` | `/v1/carriers/options` | Retorna opções de transportadora para rota e pacote |
+| `POST` | `/v1/carrier-availability/search` | Retorna opções de transportadora disponíveis para rota e pacote |
+| `GET` | `/v1/carriers` | Lista todas as transportadoras cadastradas |
 | `GET` | `/v1/carriers/{carrierCode}` | Retorna dados de uma transportadora |
+| `GET` | `/v1/carriers/{carrierCode}/status` | Retorna status operacional atual da transportadora |
+| `POST` | `/v1/carriers/{carrierCode}/webhooks/status` | Recebe atualização de status via webhook da transportadora (sem autenticação) |
+| `GET` | `/v1/carriers/{carrierCode}/service-levels` | Lista os níveis de serviço disponíveis para a transportadora |
+| `GET` | `/v1/carriers/{carrierCode}/lanes` | Lista as lanes (rotas contratadas) da transportadora |
 
 ## Eventos Kafka publicados
 

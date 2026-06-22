@@ -13,8 +13,10 @@ Calcula rotas logísticas entre origens (FCs) e destinos (CEP do buyer), determi
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `POST` | `/v1/routes/calculate` | Calcula rotas para origem/destino/modalidade |
-| `GET` | `/v1/routes/{routeId}` | Retorna detalhes de uma rota calculada |
+| `POST` | `/v1/routes/search` | Calcula rotas disponíveis para origem/destino/modalidade |
+| `GET` | `/v1/network/nodes` | Lista os nós da malha logística (FCs, hubs, última milha) |
+| `GET` | `/v1/network/lanes` | Lista as lanes (corredores) entre nós da malha |
+| `GET` | `/v1/network/lanes/{laneId}` | Retorna detalhes de uma lane específica |
 
 ## Eventos Kafka publicados
 
@@ -44,7 +46,7 @@ A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.
 |---|---|---|
 | Disponibilidade | ≥ 99.9% | 43 min/mês |
 | Error rate (5xx) | < 0.1% das requisições | — |
-| Latência P99 `POST /v1/routes/search` | < 200 ms | — |
+| Latência P99 `POST /v1/routes/search` (cálculo de rota) | < 200 ms | — |
 | Cache hit rate de rotas (Redis) | ≥ 90% | — |
 
 ## Regras de negócio principais
