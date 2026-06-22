@@ -37,6 +37,16 @@ Cria a entrega física do pedido: gera etiqueta, define volume, atribui código 
 |---|---|
 | APIs externas de transportadoras | Registrar shipment e gerar etiqueta |
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `shipment` | Persistência de `Shipment`, `ShipmentVolume`, etiqueta, Inbox e Outbox |
+| Redis | Cache opcional de etiqueta temporária e status de shipment |
+| Kafka | Consumo de `order.created`, `order.cancelled` e `shipment.commands`; publicação de `shipment.created` e `shipment.cancelled` |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
