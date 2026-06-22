@@ -44,6 +44,16 @@ Tópicos internos publicados pelo `OrderProcessManager`:
 - `payment.commands` → `PaymentService`
 - `shipment.commands` → `ShipmentService`
 
+## Persistência e infraestrutura
+
+| Recurso | Uso |
+|---|---|
+| Postgres schema `order` | Persistência de `Order`, `OrderSagaState`, compensações, Outbox, Inbox e idempotência |
+| Redis | Cache opcional de leitura de pedido |
+| Kafka | Consumo de eventos da saga e publicação de eventos de pedido e comandos internos |
+
+A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
+
 ## SLOs
 
 | Métrica | Objetivo | Error Budget (30d) |
