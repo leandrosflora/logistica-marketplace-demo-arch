@@ -5,6 +5,9 @@
 title Logística Envios - C4 Nível 2 - Containers
 
 Person(buyer, "Comprador")
+System_Ext(paymentProvider, "Provedores de pagamento", "Pix, cartões e adquirentes")
+System_Ext(carrierProvider, "Transportadoras externas", "Correios, last-mile e parceiros")
+
 System_Boundary(platform, "Logística Envios Platform") {
   Container(bff, "Marketplace BFF", ".NET 8", "Agrega dados para o frontend.")
   Container(productSearch, "Product Search Service", ".NET 8", "Busca produtos ofertados por texto livre.")
@@ -16,11 +19,16 @@ System_Boundary(platform, "Logística Envios Platform") {
   Container(routing, "Routing Service", ".NET 8", "Rota logística e SLA.")
   Container(carrier, "Carrier Service", ".NET 8", "Integra transportadoras.")
   Container(pricing, "Shipping Pricing Service", ".NET 8", "Calcula frete e subsídio.")
-  Container(order, "Order Service", ".NET 8", "Mantém pedidos.")
+  Container(order, "Order Service", ".NET 8", "Mantém pedidos e orquestra saga.")
+  Container(payment, "Payment Service", ".NET 8", "Autoriza, captura e estorna pagamentos.")
   Container(shipment, "Shipment Service", ".NET 8", "Cria shipment, etiqueta e pacote.")
   Container(tracking, "Tracking Service", ".NET 8", "Mantém status de entrega.")
-  ContainerDb(kafka, "Kafka", "Event Streaming", "Eventos de domínio.")
-  ContainerDb(redis, "Redis", "Cache", "Cache de promessa, rota e catálogo.")
+  Container(notification, "Notification Service", ".NET 8", "Notifica buyer e seller.")
+  Container(audit, "Audit Service", ".NET 8", "Persiste trilhas imutáveis de auditoria.")
+
+  ContainerDb(kafka, "Kafka", "Event Streaming", "Eventos canônicos e comandos internos de saga.")
+  ContainerDb(postgres, "Postgres / RDS", "Relational DB", "Um schema por microservice.")
+  ContainerDb(redis, "Redis", "Cache", "Cache de promise, rota, catálogo, pricing e idempotência curta.")
 }
 
 Rel(buyer, bff, "Usa")
@@ -33,9 +41,40 @@ Rel(promise, fc, "Consulta capacidade")
 Rel(promise, routing, "Calcula rota")
 Rel(promise, carrier, "Consulta restrições")
 Rel(promise, pricing, "Calcula preço")
-Rel(order, kafka, "Publica order.created")
-Rel(shipment, kafka, "Consome order.created / publica shipment.created")
-Rel(tracking, kafka, "Publica shipment.status.updated")
+
+Rel(checkout, kafka, "Publica checkout.* / consome promise")
+Rel(order, kafka, "Consome checkout.confirmed / publica order.* e comandos")
+Rel(payment, kafka, "Consome payment.commands / publica payment.*")
+Rel(shipment, kafka, "Consome order.created e shipment.commands / publica shipment.*")
+Rel(tracking, kafka, "Consome shipment.created / publica shipment.status.updated")
+Rel(notification, kafka, "Consome eventos de domínio")
+Rel(audit, kafka, "Consome eventos canônicos auditáveis")
+
+Rel(payment, paymentProvider, "Autoriza/captura/estorna")
+Rel(carrier, carrierProvider, "Consulta disponibilidade")
+Rel(shipment, carrierProvider, "Registra shipment e gera etiqueta")
+Rel(tracking, carrierProvider, "Recebe eventos de rastreio")
+
+Rel(productSearch, postgres, "Lê/grava schema product_search")
+Rel(checkout, postgres, "Lê/grava schema checkout")
+Rel(promise, postgres, "Lê/grava schema shipping_promise")
+Rel(catalog, postgres, "Lê/grava schema product_catalog")
+Rel(inventory, postgres, "Lê/grava schema inventory")
+Rel(fc, postgres, "Lê/grava schema fulfillment")
+Rel(routing, postgres, "Lê/grava schema routing")
+Rel(carrier, postgres, "Lê/grava schema carrier")
+Rel(pricing, postgres, "Lê/grava schema shipping_pricing")
+Rel(order, postgres, "Lê/grava schema order")
+Rel(payment, postgres, "Lê/grava schema payment")
+Rel(shipment, postgres, "Lê/grava schema shipment")
+Rel(tracking, postgres, "Lê/grava schema tracking")
+Rel(notification, postgres, "Lê/grava schema notification")
+Rel(audit, postgres, "Lê/grava schema audit")
+
 Rel(promise, redis, "Usa cache")
+Rel(catalog, redis, "Usa cache de atributos")
+Rel(routing, redis, "Usa cache de rotas")
+Rel(carrier, redis, "Usa cache de disponibilidade")
+Rel(pricing, redis, "Usa cache de regras")
 
 @enduml
