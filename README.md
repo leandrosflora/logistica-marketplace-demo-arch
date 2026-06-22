@@ -70,11 +70,9 @@ Este case modela uma plataforma de cálculo de frete, promessa de entrega, dispo
 | Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Integra transportadoras, Correios, parceiros e restrições. |
 | Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) | Calcula frete, custo logístico, subsídio e promoções. |
 | Order Service | [OrderService](https://github.com/leandrosflora/OrderService) | Cria e mantém o pedido após confirmação da compra. |
-| Payment Service | [PaymentService](https://github.com/leandrosflora/PaymentService) | Autoriza, captura e estorna pagamentos durante a saga do pedido. |
 | Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria a entrega física, etiqueta, volume, pacote e despacho. |
 | Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Atualiza status de entrega, eventos de transporte e rastreio. |
 | Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Notifica comprador e seller sobre alterações relevantes. |
-| Audit Service | [AuditService](https://github.com/leandrosflora/AuditService) | Mantém trilha imutável de auditoria dos eventos canônicos. |
 
 ## Specs de serviços
 
