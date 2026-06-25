@@ -1,8 +1,101 @@
 # Eventos Kafka
 
-## Envelope padrão
+## Fonte de verdade
 
-Todos os eventos canônicos Kafka devem usar o envelope abaixo:
+Este arquivo reflete a varredura do código dos microservices em **2026-06-25**.
+
+Foram considerados:
+
+- `Program.cs`, para hosted services, producers, consumers e dispatchers registrados;
+- `Infrastructure/Messaging/KafkaOptions.cs`, para nomes de tópicos configurados;
+- handlers principais de saga quando necessário para entender tópicos escritos na outbox.
+
+## Regra de leitura deste documento
+
+| Status | Significado |
+|---|---|
+| Implementado | Há producer e/ou consumer registrado no código atual. |
+| Produzido sem consumidor | O tópico é escrito por algum serviço, mas não há consumer implementado no conjunto atual. |
+| Configurado sem producer | Algum consumer está configurado para ouvir o tópico, mas nenhum producer foi localizado. |
+| Interno | Tópico de implementação da saga, não evento canônico público. |
+| Pendente | Depende de microservice ainda não implementado. |
+
+## Tópicos efetivamente implementados
+
+### Promise de frete
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService` | Implementado |
+| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService` | Implementado |
+
+### Checkout e pedido
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `checkout.confirmed` | `CheckoutService` | `OrderService` | Implementado |
+| `order.created` | `OrderService` | `ShipmentService`, `NotificationService` | Implementado |
+| `order.events` | `OrderService` | Consumidores internos/controlados | Interno; usado para eventos de confirmação/cancelamento no código atual |
+
+### Saga de estoque
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `inventory.commands` | `OrderService` | `InventoryService` | Implementado |
+| `inventory.reserved` | `InventoryService` | `OrderService` | Implementado |
+| `inventory.reservation.confirmed` | `InventoryService` | Configurado em `KafkaOptions` do `OrderService`; consumer não registrado no `Program.cs` atual | Parcial |
+| `inventory.reservation.failed` | `InventoryService` | `OrderService` | Implementado |
+| `inventory.reservation.released` | `InventoryService` | Não localizado | Produzido sem consumidor |
+
+### Saga de fulfillment
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `fulfillment.commands` | `OrderService` | `FulfillmentCenterService` | Implementado |
+| `fulfillment.capacity.reserved` | `FulfillmentCenterService` | `OrderService` | Implementado |
+| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | Configurado em `KafkaOptions` do `OrderService`; consumer não registrado no `Program.cs` atual | Parcial |
+| `fulfillment.capacity.failed` | `FulfillmentCenterService` | `OrderService` | Implementado |
+
+### Pagamento
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `payment.commands` | `OrderService` | Nenhum consumer implementado no conjunto atual | Produzido sem consumidor; depende de `PaymentService` ou adapter externo ainda ausente |
+
+> `PaymentService` não existe como repositório/microservice implementado. Portanto, `payment.commands` deve ser tratado como ponto pendente/simulável da saga, não como integração E2E completa.
+
+### Shipment e tracking
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `shipment.commands` | `OrderService` | `ShipmentService` | Implementado |
+| `order.created` | `OrderService` | `ShipmentService` | Implementado |
+| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService` | Implementado |
+| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService` | Implementado |
+| `carrier-shipment.commands` | `ShipmentService` | Nenhum consumer localizado | Produzido sem consumidor; integração com carrier pendente/simulada |
+
+## Tópicos configurados em consumer, mas sem producer implementado
+
+Os tópicos abaixo aparecem em configurações de consumer, principalmente no `NotificationService`, mas não há producer implementado nos microservices atuais:
+
+| Tópico | Consumer configurado | Situação |
+|---|---|---|
+| `order.confirmed` | `NotificationService` | Producer canônico não localizado. O `OrderService` escreve confirmação em `order.events`, não em `order.confirmed`. |
+| `order.cancelled` | `NotificationService` | Producer canônico não localizado. O `OrderService` escreve cancelamento em `order.events`. |
+| `payment.rejected` | `NotificationService` | Producer ausente porque não há `PaymentService`. |
+| `shipment.cancelled` | `NotificationService` | Producer ausente no `ShipmentService` atual. Cancelamento escreve `carrier-shipment.commands`. |
+| `shipment.creation.failed` | `OrderService` | Configurado no `KafkaOptions`, mas consumer registrado no `Program.cs` não foi localizado. |
+
+## Componentes removidos da visão implementada
+
+| Componente | Motivo |
+|---|---|
+| `AuditService` | Não existe repo/microservice implementado. Não deve aparecer como consumer real. |
+| `PaymentService` | Não existe repo/microservice implementado. A saga ainda escreve `payment.commands`, mas sem consumidor real. |
+
+## Contrato de envelope recomendado
+
+Para eventos canônicos e mensagens de integração, manter envelope com:
 
 ```json
 {
@@ -16,363 +109,43 @@ Todos os eventos canônicos Kafka devem usar o envelope abaixo:
 }
 ```
 
-## Regras de contrato
-
-1. `eventType` deve ser igual ao nome do tópico canônico.
-2. `eventId` deve ser globalmente único.
-3. `correlationId` deve ser propagado entre serviços.
-4. `payload` deve conter todos os campos necessários para os consumers declarados.
-5. Eventos canônicos representam fatos de negócio já ocorridos.
-6. Comandos internos de saga não devem ser tratados como eventos canônicos.
-7. Os nomes dos campos do payload devem ser serializados em `camelCase`.
-
-## Tópicos canônicos
-
-### `checkout.shipping.quote.requested`
-
-Publicado por: `checkout-service`
-
-Consumido por: `shipping-promise-service`, `audit-service`, `analytics`
-
-Payload canônico:
-
-```json
-{
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "destination": {
-    "zipCode": "05700-000",
-    "city": "São Paulo",
-    "state": "SP",
-    "country": "BR"
-  },
-  "items": [
-    {
-      "skuId": "uuid",
-      "sellerId": "uuid",
-      "quantity": 1,
-      "unitPrice": 129.9
-    }
-  ]
-}
-```
-
-`checkoutId` deve ser propagado no fluxo de promise para permitir que o `CheckoutService` associe a resposta assíncrona ao checkout original.
-
-### `shipping.promise.calculated`
-
-Publicado por: `shipping-promise-service`
-
-Consumido por: `checkout-service`, `audit-service`, `analytics`
-
-Payload canônico:
-
-```json
-{
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "promiseId": "promise_123",
-  "mode": "same_day",
-  "carrier": "carrier_1",
-  "estimatedDeliveryDate": "2026-06-15",
-  "cost": 14.9,
-  "currency": "BRL",
-  "source": "calculated"
-}
-```
-
-`checkoutId` é obrigatório para o consumer do `CheckoutService`.
-
-### `checkout.confirmed`
-
-Publicado por: `checkout-service`
-
-Consumido por: `order-service`, `audit-service`
-
-Payload canônico:
-
-```json
-{
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "shippingPromiseId": "promise_123",
-  "items": [
-    {
-      "skuId": "uuid",
-      "quantity": 1,
-      "unitPrice": 129.9
-    }
-  ],
-  "totalAmount": 129.9,
-  "currency": "BRL",
-  "confirmedAt": "2026-06-14T12:00:00Z"
-}
-```
-
-`checkoutId` e `shippingPromiseId` devem ser propagados para permitir que o `OrderService` associe o pedido à promessa de entrega calculada anteriormente.
-
-### `order.created`
-
-Publicado por: `order-service`
-
-Consumido por: `shipment-service`, `notification-service`, `audit-service`
-
-Payload canônico:
-
-```json
-{
-  "orderId": "uuid",
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "shippingPromiseId": "promise_123",
-  "routeId": "route_123",
-  "carrierCode": "carrier_1",
-  "serviceLevelCode": "same_day",
-  "originNodeId": "uuid",
-  "promisedDeliveryDate": "2026-06-15",
-  "destination": {
-    "street": "Av. Paulista",
-    "number": "1000",
-    "city": "São Paulo",
-    "state": "SP",
-    "zipCode": "01310-100",
-    "country": "BR"
-  },
-  "packages": [
-    {
-      "packageId": "pkg_123",
-      "weightKg": 1.2,
-      "heightCm": 10,
-      "widthCm": 20,
-      "lengthCm": 30,
-      "items": [
-        {
-          "skuId": "uuid",
-          "quantity": 1
-        }
-      ]
-    }
-  ],
-  "totalAmount": 129.9,
-  "currency": "BRL",
-  "createdAt": "2026-06-14T12:00:00Z"
-}
-```
-
-Esse contrato está enriquecido para permitir que o `ShipmentService` crie a entrega no E2E local sem lookup adicional obrigatório.
-
-### `shipment.created`
-
-Publicado por: `shipment-service`
-
-Consumido por: `tracking-service`, `notification-service`, `audit-service`
-
-Payload canônico (`schemaVersion: "1.1"`):
-
-```json
-{
-  "shipmentId": "uuid",
-  "orderId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "carrierCode": "carrier_1",
-  "serviceLevelCode": "same_day",
-  "externalShipmentId": "ext_123",
-  "trackingCode": "BR123456789",
-  "labelObjectKey": "labels/shp_123.pdf",
-  "estimatedDeliveryDate": "2026-06-15",
-  "createdAt": "2026-06-14T12:00:00Z"
-}
-```
-
-`orderId`, `buyerId` e `sellerId` devem ser propagados para permitir que `TrackingService` e `NotificationService` publiquem/consumam eventos posteriores sem lookup adicional obrigatório. `sellerId` adicionado em `schemaVersion 1.1` (mudança backward-compatible).
-
-### `shipment.status.updated`
-
-Publicado por: `tracking-service`
-
-Consumido por: `notification-service`, `audit-service`, `order-service`
-
-Payload canônico:
-
-```json
-{
-  "shipmentId": "uuid",
-  "orderId": "uuid",
-  "buyerId": "uuid",
-  "trackingCode": "BR123456789",
-  "carrierCode": "carrier_1",
-  "previousStatus": "in_transit",
-  "currentStatus": "delivered",
-  "statusDate": "2026-06-16T18:00:00Z",
-  "estimatedDeliveryDate": "2026-06-16",
-  "exceptionCode": null
-}
-```
-
-`orderId` é obrigatório para atualização do pedido no `OrderService`; `buyerId` é obrigatório para planejamento de notificação no `NotificationService`.
-
-## Novos eventos canônicos
-
-### `order.confirmed`
-
-Publicado por: `order-service`
-
-Consumido por: `notification-service`, `audit-service`
-
-Payload canônico (`schemaVersion: "1.0"`):
-
-```json
-{
-  "orderId": "uuid",
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "confirmedAt": "2026-06-14T12:01:00Z"
-}
-```
-
-Publicado quando o `OrderService` confirma que a saga de criação de pedido foi concluída com sucesso (estoque reservado, pagamento autorizado, shipment criado).
-
-### `order.cancelled`
-
-Publicado por: `order-service`
-
-Consumido por: `shipment-service`, `notification-service`, `audit-service`, `inventory-service`
-
-Payload canônico (`schemaVersion: "1.0"`):
-
-```json
-{
-  "orderId": "uuid",
-  "checkoutId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "cancellationReason": "payment_rejected",
-  "cancelledAt": "2026-06-14T12:05:00Z"
-}
-```
-
-`cancellationReason` pode ser: `payment_rejected`, `inventory_unavailable`, `buyer_requested`, `fulfillment_capacity_unavailable`, `shipment_failed`.
-
-### `payment.approved`
-
-Publicado por: `payment-service`
-
-Consumido por: `order-service`, `audit-service`
-
-Payload canônico (`schemaVersion: "1.0"`):
-
-```json
-{
-  "orderId": "uuid",
-  "paymentId": "uuid",
-  "amount": 129.9,
-  "currency": "BRL",
-  "paymentMethod": "credit_card",
-  "approvedAt": "2026-06-14T12:00:30Z"
-}
-```
-
-### `payment.rejected`
-
-Publicado por: `payment-service`
-
-Consumido por: `order-service`, `notification-service`, `audit-service`
-
-Payload canônico (`schemaVersion: "1.0"`):
-
-```json
-{
-  "orderId": "uuid",
-  "paymentId": "uuid",
-  "buyerId": "uuid",
-  "rejectionCode": "insufficient_funds",
-  "rejectedAt": "2026-06-14T12:00:30Z"
-}
-```
-
-`rejectionCode` pode ser: `insufficient_funds`, `card_expired`, `fraud_suspected`, `bank_refused`, `timeout`.
-
-### `shipment.cancelled`
-
-Publicado por: `shipment-service`
-
-Consumido por: `tracking-service`, `notification-service`, `order-service`, `audit-service`
-
-Payload canônico (`schemaVersion: "1.0"`):
-
-```json
-{
-  "shipmentId": "uuid",
-  "orderId": "uuid",
-  "buyerId": "uuid",
-  "sellerId": "uuid",
-  "cancellationReason": "order_cancelled",
-  "cancelledAt": "2026-06-14T12:06:00Z"
-}
-```
-
-## Matriz final dos contratos canônicos
-
-| Tópico | Producer | Consumers | Payload obrigatório | Status |
-|---|---|---|---|---|
-| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `destination`, `items[]` | Alinhado |
-| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | `checkoutId`, `buyerId`, `sellerId`, `promiseId`, `mode`, `carrier`, `estimatedDeliveryDate`, `cost`, `currency`, `source` | Alinhado |
-| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `items[]`, `totalAmount`, `currency`, `confirmedAt` | Alinhado |
-| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `shippingPromiseId`, `routeId`, `carrierCode`, `serviceLevelCode`, `originNodeId`, `promisedDeliveryDate`, `destination`, `packages[]`, `totalAmount`, `currency`, `createdAt` | Alinhado |
-| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `confirmedAt` | Especificado |
-| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | `orderId`, `checkoutId`, `buyerId`, `sellerId`, `cancellationReason`, `cancelledAt` | Especificado |
-| `payment.approved` | `payment-service` | `order-service`, `audit-service` | `orderId`, `paymentId`, `amount`, `currency`, `paymentMethod`, `approvedAt` | Especificado |
-| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | `orderId`, `paymentId`, `buyerId`, `rejectionCode`, `rejectedAt` | Especificado |
-| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `carrierCode`, `serviceLevelCode`, `externalShipmentId`, `trackingCode`, `labelObjectKey`, `estimatedDeliveryDate`, `createdAt` | Alinhado (v1.1) |
-| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | `shipmentId`, `orderId`, `buyerId`, `trackingCode`, `carrierCode`, `previousStatus`, `currentStatus`, `statusDate`, `estimatedDeliveryDate`, `exceptionCode` | Alinhado |
-| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | `shipmentId`, `orderId`, `buyerId`, `sellerId`, `cancellationReason`, `cancelledAt` | Especificado |
-
-## Tópicos internos de saga — OrderService
-
-Decisão arquitetural relacionada: [`ADR-0007 — Tópicos internos de saga do OrderService`](../adr/0007-order-service-internal-saga-topics.md).
-
-Além dos tópicos canônicos de domínio, o `OrderService` utiliza tópicos internos para orquestração da saga de criação de pedido.
-
-Esses tópicos são considerados contratos internos da saga e não devem ser consumidos diretamente por outros domínios sem decisão arquitetural explícita.
-
-| Tópico | Tipo | Producer | Consumer principal | Finalidade |
-|---|---|---|---|---|
-| `inventory.commands` | Command | `order-service` | `inventory-service` | Reservar, confirmar ou liberar estoque durante a saga do pedido. |
-| `fulfillment.commands` | Command | `order-service` | `fulfillment-center-service` | Validar capacidade operacional e acionar preparação logística. |
-| `payment.commands` | Command | `order-service` | `payment-service` | Solicitar autorização, captura ou cancelamento de pagamento. |
-| `shipment.commands` | Command | `order-service` | `shipment-service` | Solicitar criação, cancelamento ou atualização da entrega. |
-| `order.events` | Internal Event | `order-service` | Consumidores internos controlados | Publicar mudanças internas do ciclo de vida do pedido. |
-
-### Regra de uso
-
-Tópicos `.commands` são comandos internos de orquestração e fazem parte da implementação da saga do `OrderService`.
-
-Eles não devem ser tratados como eventos canônicos de domínio.
-
-Eventos canônicos devem representar fatos de negócio já ocorridos, com contrato estável, versionamento e ownership claro.
-
-Exemplos de eventos canônicos:
-
-- `order.created`
-- `order.confirmed`
-- `order.cancelled`
-- `payment.approved`
-- `payment.rejected`
-- `shipment.created`
-- `shipment.cancelled`
-
-### Critério para promoção
-
-Um tópico interno só deve ser promovido para tópico canônico quando:
-
-1. for consumido por múltiplos domínios independentes;
-2. representar um fato de negócio estável;
-3. tiver contrato versionado;
-4. tiver owner definido;
-5. for aprovado por nova ADR.
+Regras:
+
+1. Eventos canônicos representam fatos de negócio já ocorridos.
+2. Comandos internos da saga não devem ser tratados como eventos canônicos.
+3. `eventType` deve bater com o tópico quando o tópico for canônico.
+4. Mensagens de comando (`*.commands`) podem ter contrato próprio, mas precisam de `messageId`, chave de agregação e idempotência.
+5. Tópicos sem producer ou sem consumer implementado devem continuar marcados como pendentes/parciais.
+
+## Matriz resumida
+
+| Tópico | Producer | Consumer principal | Classificação |
+|---|---|---|---|
+| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService` | Evento implementado |
+| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService` | Evento implementado |
+| `checkout.confirmed` | `CheckoutService` | `OrderService` | Evento implementado |
+| `order.created` | `OrderService` | `ShipmentService`, `NotificationService` | Evento implementado |
+| `inventory.commands` | `OrderService` | `InventoryService` | Comando interno implementado |
+| `inventory.reserved` | `InventoryService` | `OrderService` | Evento interno implementado |
+| `inventory.reservation.confirmed` | `InventoryService` | Parcial no `OrderService` | Parcial |
+| `inventory.reservation.failed` | `InventoryService` | `OrderService` | Evento interno implementado |
+| `inventory.reservation.released` | `InventoryService` | Não localizado | Produzido sem consumidor |
+| `fulfillment.commands` | `OrderService` | `FulfillmentCenterService` | Comando interno implementado |
+| `fulfillment.capacity.reserved` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
+| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | Parcial no `OrderService` | Parcial |
+| `fulfillment.capacity.failed` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
+| `payment.commands` | `OrderService` | Não implementado | Pendente |
+| `shipment.commands` | `OrderService` | `ShipmentService` | Comando interno implementado |
+| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService` | Evento implementado |
+| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService` | Evento implementado |
+| `carrier-shipment.commands` | `ShipmentService` | Não localizado | Pendente |
+| `order.events` | `OrderService` | Interno/controlado | Interno |
+
+## Decisão prática
+
+A documentação deve tratar o E2E atual como **parcial**:
+
+- completo para checkout → promise → order → inventory/fulfillment → shipment → tracking/notification;
+- incompleto na etapa de pagamento, porque o consumidor de `payment.commands` não existe;
+- incompleto para auditoria, porque `AuditService` não existe;
+- incompleto para alguns eventos de notificação configurados sem producer canônico.
