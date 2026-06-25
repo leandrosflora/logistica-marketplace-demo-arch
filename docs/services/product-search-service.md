@@ -1,19 +1,56 @@
 # Product Search Service
 
-## Responsabilidade
+## Responsabilidade real no código
 
-Busca e rankeia produtos ofertados no marketplace a partir de texto livre e filtros (categoria, preço, seller). Alimenta o BFF e o frontend com resultados de busca e listagem de produtos. É o ponto de entrada da jornada de descoberta de produtos.
+Busca produtos ativos para o marketplace a partir de texto livre, paginação e filtros simples de contexto logístico.
 
-## Dados dominados
+O serviço entrega cards de produto para o BFF/frontend e funciona como camada de leitura. No código atual, ele **não consulta Product Catalog, Inventory, Pricing ou Shipping em tempo real** durante a busca.
 
-- **Índice de produtos ofertados**: snapshots indexados de produtos com disponibilidade, preço e seller.
+## Implementação atual
+
+| Aspecto | Situação no código |
+|---|---|
+| Stack | .NET 8, ASP.NET Core Minimal APIs |
+| Persistência | Postgres via Dapper/Npgsql |
+| Repositório registrado | `PostgresProductSearchRepository` |
+| Connection string | `Default` |
+| Tabela consultada | `products` |
+| Busca textual | `to_tsvector('portuguese', title || ' ' || coalesce(category, ''))` + fallback `ILIKE` |
+| Filtro base | `lower(status) = 'active'` |
+| OpenSearch | Existe como estrutura/evolução, mas **não é o runtime registrado no Program.cs atual** |
 
 ## APIs publicadas
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `GET` | `/v1/products/search` | Busca produtos por texto livre e/ou filtros |
-| `GET` | `/v1/products/{skuId}` | Retorna detalhes de um produto específico para exibição |
+| `GET` | `/v1/products/search` | Busca produtos por texto livre, página, tamanho de página, CEP e região |
+| `GET` | `/health` | Health check |
+| `GET` | `/health/live` | Liveness |
+| `GET` | `/health/ready` | Readiness |
+
+Não há endpoint implementado para `GET /v1/products/{skuId}` neste serviço.
+
+## Parâmetros de busca
+
+| Parâmetro | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| `query` | string | Sim | Texto pesquisado pelo usuário |
+| `page` | int | Não | Página da paginação |
+| `pageSize` | int | Não | Tamanho da página |
+| `zipCode` | string | Não | Contexto logístico futuro |
+| `region` | string | Não | Contexto/filtro logístico futuro |
+
+## Dados retornados
+
+A resposta é montada a partir das colunas:
+
+- `id`;
+- `sku_id`;
+- `seller_id`;
+- `title`;
+- `price`.
+
+Campos como imagem, estoque, avaliação, frete grátis, fulfillment e promise são retornados com valores vazios/nulos/default no mapper atual.
 
 ## Eventos Kafka publicados
 
@@ -21,36 +58,38 @@ Nenhum.
 
 ## Eventos Kafka consumidos
 
-Nenhum diretamente. O índice de produtos pode ser alimentado por eventos de domínio de catálogo (fora do escopo deste case).
+Nenhum.
 
 ## Dependências síncronas
 
-Nenhuma direta (índice local).
+Nenhuma dependência síncrona com outros microservices no código atual.
 
 ## Persistência e infraestrutura
 
 | Recurso | Uso |
 |---|---|
-| Postgres schema `product_search` | Persistência do índice materializado e metadados de indexação |
-| Redis | Cache opcional de consultas frequentes e facetas |
-| Kafka | Não utilizado diretamente no escopo atual |
+| Postgres | Read model de produtos ativos para busca |
+| Redis | Não registrado no bootstrap atual |
+| Kafka | Não utilizado diretamente |
+| OpenSearch | Planejado/evolutivo; não registrado como implementação ativa |
 
 A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
-## SLOs
+## SLOs sugeridos
 
-| Métrica | Objetivo | Error Budget (30d) |
-|---|---|---|
-| Disponibilidade | ≥ 99.5% | 3.6 h/mês |
-| Error rate (5xx) | < 1% das requisições | — |
-| Latência P99 `GET /v1/products/search` | < 300 ms | — |
-| Latência P50 `GET /v1/products/search` | < 80 ms | — |
+| Métrica | Objetivo |
+|---|---|
+| Disponibilidade | ≥ 99.5% |
+| Error rate 5xx | < 1% |
+| Latência P99 `GET /v1/products/search` | < 300 ms |
+| Latência P50 `GET /v1/products/search` | < 80 ms |
 
-## Regras de negócio principais
+## Regras práticas
 
-1. Busca DEVE retornar resultados relevantes dentro do prazo de SLO; resultado vazio é preferível a latência alta.
-2. Produto sem estoque DEVE ser filtrado ou marcado como indisponível nos resultados.
-3. Resultados DEVEM incluir `skuId`, `sellerId`, `title`, `price`, `thumbnailUrl`, `availableQuantity`.
+1. Busca deve consultar apenas produtos ativos.
+2. Resultado vazio é aceitável; latência alta não.
+3. O serviço não é fonte canônica de catálogo, estoque ou preço.
+4. OpenSearch só deve ser descrito como evolução enquanto o `Program.cs` registrar `PostgresProductSearchRepository`.
 
 ## Decisões arquiteturais relacionadas
 

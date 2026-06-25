@@ -1,25 +1,22 @@
 # Logística Envios Demo Architecture
 
-Repositório de arquitetura para estudo do case **Logística de Envios** (versão demo).
-
-Objetivo: dar contexto suficiente para o Codex entender o domínio, os microservices, os contratos, os eventos Kafka, os diagramas C4, as decisões arquiteturais, os bancos de dados e os comandos de validação local.
-
-## Licença
-
-Este repositório está licenciado sob a **Apache License 2.0**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
+Repositório de arquitetura e documentação do case **Logística de Envios**.
 
 ## Estado atual
 
-Status: **pronto para validação E2E local por fases**.
+Status: **documentação alinhada ao código atual dos microservices em 2026-06-25**.
 
-Os contratos Kafka canônicos, os tópicos internos de saga, o mapa de microservices e a matriz de dados estão alinhados. A execução final ainda deve ser validada localmente ou em CI com:
+Esta revisão reflete os repositórios de microservices existentes, seus endpoints reais, tópicos Kafka registrados, padrões de persistência e lacunas atuais.
 
-```bash
-dotnet restore
-dotnet build
-dotnet test
-docker compose up -d
-```
+## O que este repo documenta
+
+- Microservices implementados.
+- Contratos REST consolidados.
+- Eventos e comandos Kafka efetivamente configurados.
+- Lacunas da saga atual.
+- Dados, bancos, caches e padrões Inbox/Outbox.
+- Diagramas C4 e fluxos de referência.
+- Runbooks de validação local.
 
 ## Estrutura
 
@@ -32,20 +29,16 @@ logistica-envios-demo-arch
 │   ├── contracts/              # Contratos REST, Kafka, dados e schema governance
 │   ├── glossary/               # Glossário de domínio
 │   ├── prompts/                # Prompts para Codex
-│   ├── reviews/                # Reviews de contratos e PRs
+│   ├── reviews/                # Reviews e validações
 │   ├── runbooks/               # Runbooks de operação local
 │   ├── security/               # Arquitetura de segurança
 │   ├── sequence-diagrams/      # Diagramas de sequência
 │   └── services/               # Specs individuais de microservice
-├── monitoring/                 # Configuração de observabilidade (Prometheus, Grafana)
+├── monitoring/                 # Prometheus/Grafana local
 ├── docker-compose.yml
 ├── README.md
 └── AGENTS.md
 ```
-
-## Domínio
-
-Este case modela uma plataforma de cálculo de frete, promessa de entrega, disponibilidade logística, criação de shipment, pagamento, rastreio, notificação e auditoria para milhões de pedidos por dia.
 
 ## Repositórios envolvidos
 
@@ -56,93 +49,88 @@ Este case modela uma plataforma de cálculo de frete, promessa de entrega, dispo
 | Frontend | [MarketplaceWeb](https://github.com/leandrosflora/MarketplaceWeb) |
 | BFF | [MarketplaceWeb.Bff](https://github.com/leandrosflora/MarketplaceWeb.Bff) |
 
-### Microservices
+### Microservices implementados
 
-| Microservice | Repositório | Responsabilidade |
+| Microservice | Repositório | Responsabilidade prática |
 |---|---|---|
-| Checkout Service | [CheckoutService](https://github.com/leandrosflora/CheckoutService) | Orquestra a experiência de compra e publica solicitação de cotação/promise. |
-| Product Search Service | [ProductSearchService](https://github.com/leandrosflora/ProductSearchService) | Busca produtos ofertados a partir de texto livre para alimentar o marketplace/BFF. |
-| Shipping Promise Service | [ShippingPromiseService](https://github.com/leandrosflora/ShippingPromiseService) | Calcula prazo, disponibilidade, modalidade e promessa de entrega. |
-| Product Catalog Service | [ProductCatalogService](https://github.com/leandrosflora/ProductCatalogService) | Fornece peso, dimensão, categoria e restrições do produto. |
-| Inventory Service | [InventoryService](https://github.com/leandrosflora/InventoryService) | Consulta estoque por SKU, seller e fulfillment center. |
-| Fulfillment Center Service | [FulfillmentCenterService](https://github.com/leandrosflora/FulfillmentCenterService) | Informa capacidade, cutoff, operação e disponibilidade dos CDs. |
-| Routing Service | [RoutingService](https://github.com/leandrosflora/RoutingService) | Calcula rotas logísticas, malha, hubs e janelas. |
-| Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Integra transportadoras, Correios, parceiros e restrições. |
-| Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) | Calcula frete, custo logístico, subsídio e promoções. |
-| Order Service | [OrderService](https://github.com/leandrosflora/OrderService) | Cria e mantém o pedido após confirmação da compra. |
-| Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria a entrega física, etiqueta, volume, pacote e despacho. |
-| Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Atualiza status de entrega, eventos de transporte e rastreio. |
-| Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Notifica comprador e seller sobre alterações relevantes. |
+| Checkout Service | [CheckoutService](https://github.com/leandrosflora/CheckoutService) | Cria, consulta e confirma sessões de checkout; publica eventos de checkout. |
+| Product Search Service | [ProductSearchService](https://github.com/leandrosflora/ProductSearchService) | Busca produtos ativos em read model Postgres para alimentar BFF/frontend. |
+| Shipping Promise Service | [ShippingPromiseService](https://github.com/leandrosflora/ShippingPromiseService) | Calcula promessa de entrega consultando catálogo, estoque, fulfillment, rota, carrier e pricing. |
+| Product Catalog Service | [ProductCatalogService](https://github.com/leandrosflora/ProductCatalogService) | Expõe atributos logísticos de SKU. |
+| Inventory Service | [InventoryService](https://github.com/leandrosflora/InventoryService) | Consulta disponibilidade e gerencia reservas de estoque. |
+| Fulfillment Center Service | [FulfillmentCenterService](https://github.com/leandrosflora/FulfillmentCenterService) | Gerencia centros, capacidade, status e reservas operacionais. |
+| Routing Service | [RoutingService](https://github.com/leandrosflora/RoutingService) | Calcula rotas logísticas e mantém grafo de malha. |
+| Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Gerencia transportadoras, níveis de serviço, lanes e disponibilidade. |
+| Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) | Calcula frete, quotes e rate cards. |
+| Order Service | [OrderService](https://github.com/leandrosflora/OrderService) | Cria pedido a partir de checkout confirmado e orquestra a saga por Kafka/outbox. |
+| Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria shipment, pacotes, etiqueta e comandos para carrier. |
+| Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Mantém timeline/status de entrega e publica atualizações de tracking. |
+| Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Planeja e envia notificações Email/SMS/Push com preferências e receipts. |
+
+### Componentes não implementados como microservice
+
+| Componente | Situação |
+|---|---|
+| Payment Service | Não há repo/microservice implementado. O `OrderService` escreve `payment.commands`, mas não existe consumer real no conjunto atual. |
+| Audit Service | Não há repo/microservice implementado. Foi removido da visão implementada. |
 
 ## Specs de serviços
 
 Documentação detalhada por microservice em [`docs/services/`](docs/services/).
 
-| Serviço | Responsabilidade | Spec |
-|---|---|---|
-| Checkout Service | Orquestra a experiência de compra e chama a cotação de envio. | [spec](docs/services/checkout-service.md) |
-| Product Search Service | Busca produtos ofertados a partir de texto livre para alimentar o marketplace/BFF. | [spec](docs/services/product-search-service.md) |
-| Shipping Promise Service | Calcula prazo, disponibilidade, modalidade e promessa de entrega. | [spec](docs/services/shipping-promise-service.md) |
-| Product Catalog Service | Fornece peso, dimensão, categoria e restrições do produto. | [spec](docs/services/product-catalog-service.md) |
-| Inventory Service | Consulta estoque por SKU, seller e fulfillment center. | [spec](docs/services/inventory-service.md) |
-| Fulfillment Center Service | Informa capacidade, cutoff, operação e disponibilidade dos CDs. | [spec](docs/services/fulfillment-center-service.md) |
-| Routing Service | Calcula rotas logísticas, malha, hubs e janelas. | [spec](docs/services/routing-service.md) |
-| Carrier Service | Integra transportadoras, Correios, parceiros e restrições. | [spec](docs/services/carrier-service.md) |
-| Shipping Pricing Service | Calcula frete, custo logístico, subsídio e promoções. | [spec](docs/services/shipping-pricing-service.md) |
-| Order Service | Cria e mantém o pedido após confirmação da compra. | [spec](docs/services/order-service.md) |
-| Payment Service | Autoriza, captura e estorna pagamentos. | [spec](docs/services/payment-service.md) |
-| Shipment Service | Cria a entrega física, etiqueta, volume e pacote. | [spec](docs/services/shipment-service.md) |
-| Tracking Service | Atualiza status de entrega e eventos de rastreio. | [spec](docs/services/tracking-service.md) |
-| Notification Service | Notifica comprador e seller sobre alterações relevantes. | [spec](docs/services/notification-service.md) |
-| Audit Service | Mantém rastreabilidade técnica, funcional e regulatória. | [spec](docs/services/audit-service.md) |
+| Serviço | Spec |
+|---|---|
+| Checkout Service | [spec](docs/services/checkout-service.md) |
+| Product Search Service | [spec](docs/services/product-search-service.md) |
+| Shipping Promise Service | [spec](docs/services/shipping-promise-service.md) |
+| Product Catalog Service | [spec](docs/services/product-catalog-service.md) |
+| Inventory Service | [spec](docs/services/inventory-service.md) |
+| Fulfillment Center Service | [spec](docs/services/fulfillment-center-service.md) |
+| Routing Service | [spec](docs/services/routing-service.md) |
+| Carrier Service | [spec](docs/services/carrier-service.md) |
+| Shipping Pricing Service | [spec](docs/services/shipping-pricing-service.md) |
+| Order Service | [spec](docs/services/order-service.md) |
+| Shipment Service | [spec](docs/services/shipment-service.md) |
+| Tracking Service | [spec](docs/services/tracking-service.md) |
+| Notification Service | [spec](docs/services/notification-service.md) |
 
-## Kafka E2E
+## Principais correções desta revisão
 
-Contratos documentados em [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md).
+| Tema | Correção |
+|---|---|
+| Payment Service | Removido como microservice implementado; mantido apenas como lacuna/dependência de `payment.commands`. |
+| Audit Service | Removido da visão implementada. |
+| Product Search | Corrigido de OpenSearch para Postgres read model atual. |
+| Order Service | Corrigido: criação de pedido ocorre via `checkout.confirmed`, não via `POST /v1/orders`. |
+| Shipment Service | Corrigido: endpoints não usam `/v1`; cancelamento escreve `carrier-shipment.commands`, não `shipment.cancelled`. |
+| Kafka | Separado entre implementado, parcial, produzido sem consumidor e configurado sem producer. |
+| OpenAPI | Contratos REST consolidados atualizados para refletir endpoints reais observados no código. |
 
-Runbook local em [`docs/runbooks/kafka-local-e2e.md`](docs/runbooks/kafka-local-e2e.md).
+## Kafka em prática
 
-Revisão de alinhamento em [`docs/reviews/kafka-e2e-contract-review-2026-06-14.md`](docs/reviews/kafka-e2e-contract-review-2026-06-14.md).
+Contrato consolidado: [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md).
 
-### Tópicos canônicos
-
-| Tópico | Producer | Consumers | Status |
-|---|---|---|---|
-| `checkout.shipping.quote.requested` | `checkout-service` | `shipping-promise-service`, `audit-service`, `analytics` | Alinhado |
-| `shipping.promise.calculated` | `shipping-promise-service` | `checkout-service`, `audit-service`, `analytics` | Alinhado |
-| `checkout.confirmed` | `checkout-service` | `order-service`, `audit-service` | Alinhado |
-| `order.created` | `order-service` | `shipment-service`, `notification-service`, `audit-service` | Alinhado |
-| `order.confirmed` | `order-service` | `notification-service`, `audit-service` | Especificado |
-| `order.cancelled` | `order-service` | `shipment-service`, `notification-service`, `audit-service`, `inventory-service` | Especificado |
-| `payment.approved` | `payment-service` | `order-service`, `audit-service` | Especificado |
-| `payment.rejected` | `payment-service` | `order-service`, `notification-service`, `audit-service` | Especificado |
-| `shipment.created` | `shipment-service` | `tracking-service`, `notification-service`, `audit-service` | Alinhado |
-| `shipment.status.updated` | `tracking-service` | `notification-service`, `audit-service`, `order-service` | Alinhado |
-| `shipment.cancelled` | `shipment-service` | `tracking-service`, `notification-service`, `order-service`, `audit-service` | Especificado |
-
-### Tópicos internos de saga do OrderService
-
-Decisão documentada em [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md).
-
-| Tópico | Tipo | Producer | Consumer principal | Finalidade |
-|---|---|---|---|---|
-| `inventory.commands` | Command | `order-service` | `inventory-service` | Reservar, confirmar ou liberar estoque durante a saga do pedido. |
-| `fulfillment.commands` | Command | `order-service` | `fulfillment-center-service` | Validar capacidade operacional e acionar preparação logística. |
-| `payment.commands` | Command | `order-service` | `payment-service` | Solicitar autorização, captura ou cancelamento de pagamento. |
-| `shipment.commands` | Command | `order-service` | `shipment-service` | Solicitar criação, cancelamento ou atualização da entrega. |
-| `order.events` | Internal Event | `order-service` | Consumidores internos controlados | Publicar mudanças internas do ciclo de vida do pedido. |
+| Fluxo | Status |
+|---|---|
+| Checkout → Shipping Promise → Checkout | Implementado |
+| Checkout Confirmed → Order | Implementado |
+| Order → Inventory/Fulfillment | Implementado |
+| Order → Payment | Parcial; `payment.commands` é produzido, mas não há consumer implementado |
+| Order/Shipment → Tracking | Implementado |
+| Tracking/Order/Shipment → Notification | Parcial; há consumers configurados para tópicos sem producer atual |
+| Auditoria centralizada | Não implementada como microservice |
 
 ## Dados e bancos
 
-Matriz canônica em [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md).
+Matriz canônica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md).
 
-| Recurso | Convenção |
+| Recurso | Convenção prática |
 |---|---|
-| Postgres local | Banco `logistica_envios` com um schema por microservice |
-| Redis | Cache compartilhado local com prefixo por serviço |
-| Kafka | Eventos canônicos e comandos internos de saga |
-| Outbox | `<schema>.outbox_messages` para producers canônicos |
-| Inbox | `<schema>.inbox_messages` para consumers Kafka |
+| Postgres local | Banco compartilhado por schemas/connections conforme cada microservice |
+| Redis | Usado apenas por serviços que registram Redis no bootstrap |
+| Kafka | Eventos/comandos conforme implementação atual |
+| Outbox | Implementado nos serviços produtores conforme código |
+| Inbox | Implementado nos serviços consumidores conforme código |
 
 ## Fluxos principais
 
@@ -156,22 +144,25 @@ CheckoutService
   -> CheckoutService
 ```
 
-### Pedido, pagamento, shipment, tracking e notification
+### Pedido e saga parcial
 
 ```text
 CheckoutService
   -> checkout.confirmed
   -> OrderService
-  -> payment.commands
-  -> PaymentService
-  -> payment.approved/payment.rejected
+  -> order.created
+  -> inventory.commands / fulfillment.commands
+  -> InventoryService / FulfillmentCenterService
+  -> inventory.* / fulfillment.*
   -> OrderService
-  -> order.created/order.confirmed/order.cancelled
-  -> ShipmentService / NotificationService / AuditService
-  -> shipment.created/shipment.cancelled
-  -> TrackingService
+  -> payment.commands
+  -> [lacuna: PaymentService não implementado]
+  -> shipment.commands / order.events
+  -> ShipmentService
+  -> shipment.created
+  -> TrackingService / NotificationService
   -> shipment.status.updated
-  -> OrderService / NotificationService / AuditService
+  -> OrderService / NotificationService
 ```
 
 ## Contratos
@@ -197,108 +188,24 @@ CheckoutService
 - Fonte: [`docs/c4/logistica-envios-container.puml`](docs/c4/logistica-envios-container.puml)
 - Imagem: [`docs/c4/logistica-envios-container.svg`](docs/c4/logistica-envios-container.svg)
 
-### Sequence diagrams
-
-- Fonte: [`docs/sequence-diagrams/quote-shipping.puml`](docs/sequence-diagrams/quote-shipping.puml)
-- Imagem: [`docs/sequence-diagrams/quote-shipping.svg`](docs/sequence-diagrams/quote-shipping.svg)
+> O PlantUML fonte foi atualizado nesta revisão. SVGs podem ser regenerados pelo workflow de renderização.
 
 ## ADRs
 
 - [`docs/adr/0001-use-event-driven-architecture.md`](docs/adr/0001-use-event-driven-architecture.md)
-- [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md)
 - [`docs/adr/0002-saga-orchestrator-pattern.md`](docs/adr/0002-saga-orchestrator-pattern.md)
 - [`docs/adr/0003-hexagonal-clean-architecture.md`](docs/adr/0003-hexagonal-clean-architecture.md)
 - [`docs/adr/0004-kafka-schema-versioning.md`](docs/adr/0004-kafka-schema-versioning.md)
 - [`docs/adr/0005-idempotency-strategy.md`](docs/adr/0005-idempotency-strategy.md)
 - [`docs/adr/0006-observability-stack.md`](docs/adr/0006-observability-stack.md)
-
-## Glossário
-
-- [`docs/glossary/domain-glossary.md`](docs/glossary/domain-glossary.md)
-
-## CI/CD
-
-- [`docs/cicd/pipeline.md`](docs/cicd/pipeline.md)
+- [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md)
 
 ## Runbooks e revisões
 
 - [`docs/runbooks/kafka-local-e2e.md`](docs/runbooks/kafka-local-e2e.md)
 - [`docs/runbooks/observability-local.md`](docs/runbooks/observability-local.md)
-- [`docs/reviews/kafka-e2e-validation-2026-06-14.md`](docs/reviews/kafka-e2e-validation-2026-06-14.md)
-- [`docs/reviews/kafka-e2e-contract-review-2026-06-14.md`](docs/reviews/kafka-e2e-contract-review-2026-06-14.md)
+- [`docs/reviews/microservices-code-alignment-2026-06-25.md`](docs/reviews/microservices-code-alignment-2026-06-25.md)
 
-## Validação local
+## Licença
 
-### Subir dependências locais
-
-```bash
-docker compose up -d
-```
-
-### Validar containers
-
-```bash
-docker compose ps
-```
-
-### Criar tópicos Kafka
-
-Use o runbook completo:
-
-```text
-docs/runbooks/kafka-local-e2e.md
-```
-
-Ele cria os 11 tópicos canônicos e os 5 tópicos internos de saga.
-
-### Kafka UI
-
-```text
-http://localhost:8088
-```
-
-## Validação de artefatos
-
-### Validar OpenAPI/YAML
-
-```bash
-docker run --rm -v "$PWD:/work" mikefarah/yq eval docs/contracts/logistica-envios-apis.openapi.yaml
-```
-
-### Validar PlantUML
-
-```bash
-docker run --rm -v "$PWD:/work" plantuml/plantuml -checkmetadata /work/docs/c4/*.puml /work/docs/sequence-diagrams/*.puml
-```
-
-### Gerar imagens SVG dos diagramas
-
-```bash
-docker run --rm -v "$PWD:/work" plantuml/plantuml -tsvg /work/docs/c4/*.puml /work/docs/sequence-diagrams/*.puml
-```
-
-## Como usar com Codex
-
-Ao pedir implementação, informe explicitamente:
-
-```text
-Use este repositório como fonte de contexto arquitetural.
-Respeite AGENTS.md, contratos em docs/contracts, decisões em docs/adr e diagramas em docs/c4.
-Não invente dependências fora dos padrões definidos.
-```
-
-Para correções de Kafka E2E, use também:
-
-```text
-Respeite o contrato canônico em docs/contracts/kafka-events.md e valide o fluxo local com docs/runbooks/kafka-local-e2e.md.
-```
-
-## DevOps
-
-Documentação de CI/CD, qualidade, segurança e observabilidade do projeto:
-
-- docs/devops/ci-cd.md
-- docs/devops/security.md
-- docs/devops/observability.md
-- docs/devops/environments.md
-- docs/devops/deployment.md
+Este repositório está licenciado sob a **Apache License 2.0**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
