@@ -1,78 +1,107 @@
 # Order Service
 
-## Responsabilidade
+## Responsabilidade real no código
 
-Cria e mantém o pedido após confirmação do checkout. Orquestra a saga de criação de pedido via `OrderProcessManager`, coordenando reserva de estoque, validação de fulfillment, autorização de pagamento e criação de shipment.
+Mantém pedidos criados a partir de `checkout.confirmed` e orquestra a saga de pedido por Kafka/outbox.
+
+No estado atual, o serviço:
+
+- consome confirmação de checkout;
+- cria `Order`;
+- publica `order.created`;
+- envia comandos para estoque e fulfillment;
+- envia `payment.commands` quando estoque e capacidade estão reservados;
+- envia `shipment.commands` quando a saga avança para criação de shipment;
+- atualiza pedido com eventos de shipment/tracking;
+- expõe consulta e cancelamento de pedido por HTTP.
+
+## Lacuna importante
+
+`PaymentService` não existe como microservice implementado. Portanto, a etapa de pagamento da saga é uma dependência pendente/simulável.
+
+Além disso, o `OrderService` possui handlers internos para eventos de pagamento no `OrderProcessManager`, mas o `Program.cs` atual **não registra hosted consumers de pagamento** e o `KafkaOptions` atual **não declara tópicos `payment.approved`/`payment.rejected`**.
 
 ## Dados dominados
 
-- **Order**: pedido confirmado com status, itens, endereço de entrega e promessa de entrega.
-- **OrderSagaState**: estado corrente da saga de criação de pedido (etapa atual, compensações pendentes).
+- **Order**: pedido com checkout, buyer, seller, itens, status, valores, reservas, pagamento e shipment associados.
+- **OrderItem**: itens do pedido.
+- **InboxMessage**: controle de idempotência de mensagens consumidas.
+- **OutboxMessage**: mensagens produzidas para Kafka.
 
 ## APIs publicadas
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `POST` | `/v1/orders` | Cria um novo pedido (idempotente via `x-idempotency-key`) |
-| `GET` | `/v1/orders/{orderId}` | Retorna status e dados do pedido |
-| `POST` | `/v1/orders/{orderId}/cancel` | Solicita cancelamento do pedido |
+| `GET` | `/orders/{orderId}` | Retorna status e dados do pedido |
+| `POST` | `/orders/{orderId}/cancel` | Solicita cancelamento do pedido; exige header `Idempotency-Key` |
+| `GET` | `/health` | Health check |
 
-## Eventos Kafka publicados
+Não há endpoint `POST /v1/orders` implementado no código atual. A criação do pedido ocorre por consumo de `checkout.confirmed`.
 
-| Tópico | Quando | Schema |
+## Eventos e comandos publicados
+
+| Tópico | Quando | Status prático |
 |---|---|---|
-| `order.created` | Pedido criado com sucesso | [kafka-events.md](../contracts/kafka-events.md#ordercreated) |
-| `order.confirmed` | Saga concluída com sucesso | [kafka-events.md](../contracts/kafka-events.md#novos-eventos-canônicos) |
-| `order.cancelled` | Pedido cancelado (saga falhada ou cancelamento do buyer) | [kafka-events.md](../contracts/kafka-events.md#novos-eventos-canônicos) |
+| `order.created` | Ao consumir `checkout.confirmed` e criar o pedido | Implementado |
+| `inventory.commands` | Para reservar, confirmar ou liberar reserva de estoque | Implementado |
+| `fulfillment.commands` | Para reservar, confirmar ou liberar capacidade de fulfillment | Implementado |
+| `payment.commands` | Para autorizar, capturar ou cancelar autorização de pagamento | Produzido, mas sem consumer implementado |
+| `shipment.commands` | Para solicitar criação de shipment | Implementado |
+| `order.events` | Para eventos internos de confirmação/cancelamento | Interno; não equivale hoje a `order.confirmed`/`order.cancelled` canônicos |
 
-## Eventos Kafka consumidos
+## Eventos Kafka consumidos registrados no bootstrap
 
-| Tópico | Consumer Group | Finalidade |
+| Tópico | Consumer/handler registrado | Finalidade |
 |---|---|---|
-| `checkout.confirmed` | `order-service` | Disparar criação do pedido e início da saga |
-| `shipment.status.updated` | `order-service` | Atualizar status de entrega no pedido |
-| `shipment.cancelled` | `order-service` | Atualizar pedido quando um shipment é cancelado externamente |
-| `payment.approved` | `order-service` | Avançar saga após aprovação de pagamento |
-| `payment.rejected` | `order-service` | Iniciar compensação da saga |
+| `checkout.confirmed` | `CheckoutConfirmedConsumer` | Criar pedido e iniciar saga |
+| `inventory.reserved` | `InventoryReservedConsumer` | Marcar estoque reservado e avaliar avanço da saga |
+| `inventory.reservation.failed` | `InventoryReservationFailedConsumer` | Cancelar/compensar saga |
+| `fulfillment.capacity.reserved` | `FulfillmentCapacityReservedConsumer` | Marcar capacidade reservada e avaliar avanço da saga |
+| `fulfillment.capacity.failed` | `FulfillmentCapacityFailedConsumer` | Cancelar/compensar saga |
+| `shipment.created` | `ShipmentCreatedConsumer` | Associar shipment ao pedido e disparar captura de pagamento |
+| `shipment.status.updated` | `ShipmentStatusUpdatedConsumer` | Atualizar status de entrega no pedido |
+
+## Tópicos declarados em configuração, mas sem hosted consumer localizado
+
+| Tópico | Observação |
+|---|---|
+| `inventory.reservation.confirmed` | Existe em `KafkaOptions`; handler interno existe, mas consumer registrado no `Program.cs` não foi localizado. |
+| `fulfillment.capacity.confirmed` | Existe em `KafkaOptions`; handler interno existe, mas consumer registrado no `Program.cs` não foi localizado. |
+| `shipment.creation.failed` | Existe em `KafkaOptions`; consumer registrado no `Program.cs` não foi localizado. |
 
 ## Dependências síncronas
 
-Nenhuma (orquestra via tópicos internos de saga Kafka).
-
-Tópicos internos publicados pelo `OrderProcessManager`:
-- `inventory.commands` → `InventoryService`
-- `fulfillment.commands` → `FulfillmentCenterService`
-- `payment.commands` → `PaymentService`
-- `shipment.commands` → `ShipmentService`
+Nenhuma dependência HTTP síncrona registrada. A integração ocorre via Kafka/outbox.
 
 ## Persistência e infraestrutura
 
 | Recurso | Uso |
 |---|---|
-| Postgres schema `order` | Persistência de `Order`, `OrderSagaState`, compensações, Outbox, Inbox e idempotência |
-| Redis | Cache opcional de leitura de pedido |
-| Kafka | Consumo de eventos da saga e publicação de eventos de pedido e comandos internos |
+| Postgres `OrderDb` | Persistência de pedidos, itens, inbox e outbox |
+| Schema fallback | `order_domain` no fallback de connection string |
+| Kafka | Consumo de eventos da saga e publicação de eventos/comandos |
+| Redis | Não registrado no bootstrap atual |
+| OpenTelemetry | Tracing, metrics e exporter OTLP |
 
 A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
-## SLOs
+## SLOs sugeridos
 
-| Métrica | Objetivo | Error Budget (30d) |
-|---|---|---|
-| Disponibilidade | ≥ 99.9% | 43 min/mês |
-| Error rate (5xx) | < 0.1% das requisições | — |
-| Latência P99 `POST /v1/orders` | < 500 ms | — |
-| Latência P99 `GET /v1/orders/{id}` | < 100 ms | — |
-| Tempo P95 de conclusão da saga (`checkout.confirmed` → `order.confirmed`) | < 30 s | — |
-| Taxa de sagas concluídas com sucesso | ≥ 99.5% | — |
+| Métrica | Objetivo |
+|---|---|
+| Disponibilidade | ≥ 99.9% |
+| Error rate 5xx | < 0.1% |
+| Latência P99 `GET /orders/{id}` | < 100 ms |
+| Latência P99 `POST /orders/{id}/cancel` | < 500 ms |
 
 ## Regras de negócio principais
 
-1. `POST /orders` DEVE ser idempotente: mesmo `checkoutId` resulta no mesmo `orderId`.
-2. O `OrderProcessManager` DEVE persistir o estado da saga em banco para suportar recovery após falha.
-3. Em caso de falha em qualquer etapa da saga, as compensações DEVEM ser executadas na ordem inversa das ações bem-sucedidas.
-4. Um pedido DEVE ter exatamente um `shippingPromiseId` associado, que foi previamente calculado.
-5. Eventos canônicos (`order.created`, `order.confirmed`, `order.cancelled`) DEVEM ser publicados via Outbox Pattern.
+1. Pedido nasce a partir de `checkout.confirmed`; não por API pública de criação.
+2. Processamento de mensagens usa inbox para evitar duplicidade.
+3. Publicação usa outbox para garantir entrega eventual.
+4. Estoque e capacidade são reservados antes da etapa de pagamento.
+5. Pagamento está pendente de implementação de consumer real de `payment.commands`.
+6. `order.events` é tópico interno/controlado, não deve ser vendido como tópico canônico público sem ajuste no código.
 
 ## Decisões arquiteturais relacionadas
 
