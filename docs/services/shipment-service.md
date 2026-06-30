@@ -1,69 +1,84 @@
 # Shipment Service
 
-## Responsabilidade
+## Responsabilidade real no código
 
-Cria a entrega física do pedido: gera etiqueta, define volume, atribui código de rastreio e envia o shipment para a transportadora. Gerencia o ciclo de vida do shipment desde a criação até o encerramento.
+Cria e consulta shipments físicos a partir de pedidos, pacotes e comandos da saga. Também gera/acessa etiqueta e solicita cancelamento junto à integração de carrier.
+
+No código atual, o serviço consome `order.created` e `shipment.commands`, publica `shipment.created` e escreve `carrier-shipment.commands` em cancelamento.
 
 ## Dados dominados
 
-- **Shipment**: entidade de entrega com `shipmentId`, etiqueta, código de rastreio, transportadora e status.
-- **ShipmentVolume**: informações de volume e pacotes do shipment.
+- **Shipment**: entrega com order, carrier, service level, tracking code, label e status.
+- **Package**: volume físico do shipment.
+- **PackageItem**: itens contidos em cada pacote.
+- **InboxMessage**: controle de idempotência de mensagens/comandos consumidos.
+- **OutboxMessage**: mensagens produzidas para Kafka/integrações.
 
 ## APIs publicadas
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| `GET` | `/v1/shipments/{shipmentId}` | Retorna detalhes de um shipment |
-| `POST` | `/v1/shipments/{shipmentId}/cancel` | Cancela um shipment |
+| `GET` | `/shipments/{shipmentId}` | Retorna detalhes de um shipment |
+| `GET` | `/shipments/{shipmentId}/label` | Retorna URL temporária para download da etiqueta |
+| `POST` | `/shipments/{shipmentId}/cancel` | Solicita cancelamento do shipment; exige header `Idempotency-Key` |
+| `GET` | `/health` | Health check |
 
-## Eventos Kafka publicados
+Não há prefixo `/v1` nos endpoints de shipment do código atual.
 
-| Tópico | Quando | Schema |
+## Eventos/comandos publicados
+
+| Tópico | Quando | Status prático |
 |---|---|---|
-| `shipment.created` | Shipment criado com sucesso | [kafka-events.md](../contracts/kafka-events.md#shipmentcreated) |
-| `shipment.cancelled` | Shipment cancelado | [kafka-events.md](../contracts/kafka-events.md#novos-eventos-canônicos) |
+| `shipment.created` | Shipment criado com sucesso | Implementado |
+| `carrier-shipment.commands` | Cancelamento solicitado para integração com carrier | Produzido, mas consumer não localizado no conjunto atual |
+
+`shipment.cancelled` não aparece em `KafkaOptions` do `ShipmentService` atual e não deve ser documentado como evento publicado implementado.
 
 ## Eventos Kafka consumidos
 
-| Tópico | Consumer Group | Finalidade |
-|---|---|---|
-| `order.created` | `shipment-service` | Criar shipment a partir do pedido |
-| `order.cancelled` | `shipment-service` | Cancelar shipment se pedido for cancelado |
-| `shipment.commands` | `shipment-service` | Criar/cancelar shipment via saga do OrderService |
+| Tópico | Consumer group | Finalidade | Status |
+|---|---|---|---|
+| `order.created` | `shipment-service` | Criar shipment a partir do pedido | Implementado |
+| `shipment.commands` | `shipment-service` | Criar/cancelar/atualizar shipment via saga do `OrderService` | Implementado |
+
+`order.cancelled` não está configurado no `KafkaOptions` atual do `ShipmentService`.
 
 ## Dependências síncronas
 
 | Serviço | Finalidade |
 |---|---|
-| APIs externas de transportadoras | Registrar shipment e gerar etiqueta |
+| Carrier Service | Registrar shipment, reservar/coordenar carrier e gerar etiqueta |
+
+A integração HTTP com Carrier Service usa `HttpClient` com timeout e resiliência.
 
 ## Persistência e infraestrutura
 
 | Recurso | Uso |
 |---|---|
-| Postgres schema `shipment` | Persistência de `Shipment`, `ShipmentVolume`, etiqueta, Inbox e Outbox |
-| Redis | Cache opcional de etiqueta temporária e status de shipment |
-| Kafka | Consumo de `order.created`, `order.cancelled` e `shipment.commands`; publicação de `shipment.created` e `shipment.cancelled` |
+| Postgres `ShipmentDb` | Persistência de shipment, packages, inbox e outbox |
+| FileSystemLabelStorage | Armazenamento/geração de URL temporária de etiqueta em ambiente local/demo |
+| Kafka | Consumo de `order.created`/`shipment.commands`; publicação de `shipment.created` |
+| Redis | Não registrado no bootstrap atual |
+| OpenTelemetry | Tracing, metrics e exporter OTLP |
 
 A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.md).
 
-## SLOs
+## SLOs sugeridos
 
-| Métrica | Objetivo | Error Budget (30d) |
-|---|---|---|
-| Disponibilidade | ≥ 99.9% | 43 min/mês |
-| Error rate (5xx) | < 0.1% das requisições | — |
-| Latência P99 `GET /v1/shipments/{id}` | < 150 ms | — |
-| Tempo P95 entre consumo de `order.created` e publicação de `shipment.created` | < 60 s | — |
-| Taxa de shipments criados com sucesso | ≥ 99% | — |
+| Métrica | Objetivo |
+|---|---|
+| Disponibilidade | ≥ 99.9% |
+| Error rate 5xx | < 0.1% |
+| Latência P99 `GET /shipments/{id}` | < 150 ms |
+| Tempo P95 entre consumo de `order.created` e publicação de `shipment.created` | < 60 s |
 
-## Regras de negócio principais
+## Regras práticas
 
-1. `shipment.created` DEVE ser publicado via Outbox Pattern para garantir entrega.
-2. Consumer de `order.created` DEVE implementar Inbox Pattern (deduplicação por `eventId`).
-3. `sellerId`, `orderId` e `buyerId` DEVEM ser propagados do `order.created` para o `shipment.created`.
-4. Geração de etiqueta deve ter circuit breaker para APIs de transportadora.
-5. Shipment DEVE incluir `externalShipmentId` (ID na transportadora) para rastreio externo.
+1. `shipment.created` deve ser publicado via outbox.
+2. Consumers devem deduplicar mensagens via inbox.
+3. `sellerId`, `orderId` e `buyerId` devem ser propagados do pedido para o shipment.
+4. Cancelamento atual não publica `shipment.cancelled`; ele escreve `carrier-shipment.commands`.
+5. A documentação não deve declarar `order.cancelled` como consumer do `ShipmentService` sem alteração no código.
 
 ## Decisões arquiteturais relacionadas
 

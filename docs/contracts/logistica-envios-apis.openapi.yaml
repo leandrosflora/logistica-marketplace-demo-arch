@@ -1,1684 +1,619 @@
 openapi: 3.0.3
 info:
   title: Logística Envios - API Contracts
-  version: 1.0.0
+  version: 2026.06.25
   description: >-
-    Contratos OpenAPI consolidados dos microservices da plataforma Logística Envios.
-    Este arquivo é a visão canônica para integração entre Frontend/BFF e microservices.
-    Autenticação via JWT Bearer (OAuth2 Client Credentials). Todos os endpoints exigem
-    autorização exceto health checks, tracking público e webhooks de carriers/providers.
-  contact:
-    name: Logística Envios Platform Team
-    email: plataforma-envios@logistica.internal
-
+    Contratos REST consolidados a partir dos endpoints implementados nos microservices
+    em 2026-06-25. Este arquivo não documenta PaymentService nem AuditService,
+    pois esses microservices não existem no conjunto atual.
 servers:
   - url: http://localhost
-    description: Base local genérica; cada serviço possui sua própria porta no repositório correspondente.
-
-security:
-  - BearerAuth: []
+    description: Base local genérica; cada microservice possui sua própria porta.
 
 tags:
   - name: Health
-    description: Liveness e readiness probes para Kubernetes. Não requerem autenticação.
-  - name: MarketplaceWeb.Bff
-    description: BFF (Backend for Frontend) do canal web. Agrega dados de múltiplos microservices e serve o frontend React.
   - name: ProductSearchService
-    description: Busca textual e por facetas de produtos. Mantém índice materializado atualizado via eventos Kafka.
-  - name: ProductCatalogService
-    description: Catálogo de produtos e atributos logísticos (dimensões, peso, restrições). Fonte de verdade para atributos físicos do SKU.
   - name: CheckoutService
-    description: Sessões de checkout com idempotência. Orquestra cotação assíncrona de frete via Kafka e confirma o carrinho do comprador publicando checkout.confirmed.
   - name: ShippingPromiseService
-    description: Calcula a promessa de entrega (prazo, modalidade, carrier, custo) consultando catálogo, estoque, fulfillment, roteamento, carrier e precificação.
+  - name: ProductCatalogService
   - name: InventoryService
-    description: Gestão de saldo e reservas de estoque por seller e fulfillment center. Suporta reserva temporária, confirmação e liberação.
   - name: FulfillmentCenterService
-    description: Capacidade operacional dos centros de fulfillment. Fornece centros candidatos e gerencia reservas de capacidade diária.
   - name: RoutingService
-    description: Grafo logístico de nós e lanes. Calcula rotas disponíveis entre origem e destino considerando janelas de operação.
   - name: CarrierService
-    description: Cadastro de transportadoras, níveis de serviço e disponibilidade real-time. Recebe webhooks de atualização de status.
   - name: ShippingPricingService
-    description: Precificação de frete com subsídio e tabelas de preço (rate cards). Retorna preço ao cliente, custo logístico e subsídios aplicados.
   - name: OrderService
-    description: Pedido confirmado. Consome checkout.confirmed, executa a saga de reservas e pagamento via Outbox Pattern, e publica order.created.
   - name: ShipmentService
-    description: Remessa física (shipment), volumes, etiqueta e cancelamento. Criado a partir do evento order.created.
   - name: TrackingService
-    description: Linha do tempo de tracking. Consulta pública por código de rastreio; consulta autenticada por shipmentId.
   - name: NotificationService
-    description: Envio de notificações multicanal (Email, SMS, Push) e gerenciamento de preferências de destinatários.
-  - name: AuditService
-    description: Trilha de auditoria dos eventos funcionais e técnicos da plataforma. Somente leitura via API; escrita exclusivamente via Kafka.
 
 paths:
-
-  # ── Health ────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check genérico
+      responses:
+        '200': { description: OK }
   /health/live:
     get:
       tags: [Health]
-      summary: Liveness probe
-      operationId: healthLive
-      security: []
+      summary: Liveness probe quando implementado pelo serviço
       responses:
-        '200':
-          description: Serviço ativo
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/HealthResponse' }
-
+        '200': { description: OK }
   /health/ready:
     get:
       tags: [Health]
-      summary: Readiness probe
-      operationId: healthReady
-      security: []
+      summary: Readiness probe quando implementado pelo serviço
       responses:
-        '200':
-          description: Serviço pronto para receber tráfego
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/HealthResponse' }
-        '503':
-          description: Serviço não disponível (dependências não prontas)
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '200': { description: OK }
+        '503': { description: Dependência indisponível }
 
-  # ── MarketplaceWeb BFF ─────────────────────────────────────────────────────
-  /api/web/v1/products/search:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Busca produtos para o canal web via BFF
-      operationId: bffSearchProducts
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/QueryText'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - name: zipCode
-          in: query
-          required: false
-          schema: { type: string }
-        - name: region
-          in: query
-          required: false
-          schema: { type: string }
-      responses:
-        '200':
-          description: Resultado paginado de produtos
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductSearchResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/products/{skuId}:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Consulta dados públicos de produto via BFF
-      operationId: bffGetProduct
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SkuId'
-      responses:
-        '200':
-          description: Produto encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/products/{skuId}/page:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Retorna payload composto para página de produto
-      operationId: bffGetProductPage
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SkuId'
-        - name: quantity
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 99, default: 1 }
-        - name: zipCode
-          in: query
-          required: false
-          schema: { type: string }
-      responses:
-        '200':
-          description: Página de produto composta
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductPageResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/shipping-promises:
-    post:
-      tags: [MarketplaceWeb.Bff]
-      summary: Calcula promessa de frete via BFF
-      operationId: bffCalculateShippingPromise
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ShippingPromiseRequest' }
-      responses:
-        '200':
-          description: Promessa calculada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShippingPromiseResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/checkouts:
-    post:
-      tags: [MarketplaceWeb.Bff]
-      summary: Cria checkout via BFF
-      operationId: bffCreateCheckout
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/BffCreateCheckoutRequest' }
-      responses:
-        '201':
-          description: Checkout criado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/checkouts/{checkoutId}:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Consulta checkout via BFF
-      operationId: bffGetCheckout
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CheckoutId'
-      responses:
-        '200':
-          description: Checkout encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/checkouts/{checkoutId}/confirm:
-    post:
-      tags: [MarketplaceWeb.Bff]
-      summary: Confirma checkout via BFF
-      operationId: bffConfirmCheckout
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CheckoutId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/BffConfirmCheckoutRequest' }
-      responses:
-        '200':
-          description: Checkout confirmado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BffCheckoutResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/orders/{orderId}:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Retorna página composta do pedido
-      operationId: bffGetOrderPage
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/OrderId'
-      responses:
-        '200':
-          description: Página de pedido
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OrderPageResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/orders/{orderId}/cancel:
-    post:
-      tags: [MarketplaceWeb.Bff]
-      summary: Cancela pedido via BFF
-      operationId: bffCancelOrder
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/OrderId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CancelOrderRequest' }
-      responses:
-        '202': { description: Cancelamento aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/orders/{orderId}/tracking:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Consulta tracking do pedido via BFF
-      operationId: bffGetOrderTracking
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/OrderId'
-      responses:
-        '200':
-          description: Tracking do pedido
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TrackingResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /api/web/v1/shipments/{shipmentId}/label:
-    get:
-      tags: [MarketplaceWeb.Bff]
-      summary: Baixa etiqueta de expedição via BFF
-      operationId: bffGetShipmentLabel
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/ShipmentId'
-      responses:
-        '200':
-          description: URL temporária da etiqueta
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  # ── ProductSearchService ───────────────────────────────────────────────────
   /v1/products/search:
     get:
       tags: [ProductSearchService]
-      summary: Busca textual de produtos no índice materializado
-      operationId: searchProducts
+      summary: Busca produtos ativos no read model Postgres
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/QueryText'
-        - $ref: '#/components/parameters/Page'
-        - name: pageSize
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
-        - name: zipCode
-          in: query
-          required: false
-          schema: { type: string }
-        - name: region
-          in: query
-          required: false
-          schema: { type: string }
+        - { name: query, in: query, required: true, schema: { type: string } }
+        - { name: page, in: query, required: false, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, required: false, schema: { type: integer, default: 20 } }
+        - { name: zipCode, in: query, required: false, schema: { type: string } }
+        - { name: region, in: query, required: false, schema: { type: string } }
       responses:
-        '200':
-          description: Resultado de busca
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductSearchResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Resultado paginado }
+        '400': { description: Query inválida }
 
-  # ── ProductCatalogService ──────────────────────────────────────────────────
-  /v1/products:
-    post:
-      tags: [ProductCatalogService]
-      summary: Cria produto/SKU
-      operationId: createProduct
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateProductRequest' }
-      responses:
-        '201':
-          description: Produto criado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/products/{skuId}:
-    get:
-      tags: [ProductCatalogService]
-      summary: Consulta produto por SKU
-      operationId: getProduct
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SkuId'
-      responses:
-        '200':
-          description: Produto encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/products/physical-info/batch:
-    post:
-      tags: [ProductCatalogService]
-      summary: Consulta informações físicas de SKUs em lote
-      operationId: getProductPhysicalInfoBatch
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ProductPhysicalInfoBatchRequest' }
-      responses:
-        '200':
-          description: Informações físicas encontradas
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/ProductPhysicalInfoResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/products/{skuId}/physical-info:
-    put:
-      tags: [ProductCatalogService]
-      summary: Atualiza informações físicas de SKU
-      operationId: updateProductPhysicalInfo
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SkuId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateProductPhysicalInfoRequest' }
-      responses:
-        '200':
-          description: Produto atualizado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/products/{skuId}/status:
-    patch:
-      tags: [ProductCatalogService]
-      summary: Altera status de produto
-      operationId: updateProductStatus
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SkuId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateProductStatusRequest' }
-      responses:
-        '200':
-          description: Produto atualizado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ProductResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  # ── CheckoutService ────────────────────────────────────────────────────────
-  /v1/checkouts:
+  /v1/checkouts/:
     post:
       tags: [CheckoutService]
       summary: Cria sessão de checkout
-      operationId: createCheckout
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateCheckoutRequest' }
+            schema: { type: object }
       responses:
-        '201':
-          description: Checkout criado. Evento checkout.shipping.quote.requested publicado para cotação assíncrona.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CheckoutResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '201': { description: Checkout criado }
+        '400': { description: Header Idempotency-Key ausente ou payload inválido }
   /v1/checkouts/{checkoutId}:
     get:
       tags: [CheckoutService]
       summary: Consulta checkout
-      operationId: getCheckout
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/CheckoutId'
       responses:
-        '200':
-          description: Checkout encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CheckoutResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/checkouts/{checkoutId}/shipping-options:
-    get:
-      tags: [CheckoutService]
-      summary: Retorna opções de frete disponíveis para o checkout
-      description: >-
-        Retorna as opções de frete calculadas assincronamente. O CheckoutService
-        consome o evento shipping.promise.calculated e persiste a ShippingPromiseProjection.
-        Retorna lista vazia com quoteStatus=Pending enquanto a cotação ainda não chegou.
-      operationId: getCheckoutShippingOptions
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CheckoutId'
-      responses:
-        '200':
-          description: Opções de frete (lista vazia se cotação ainda pendente)
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShippingOptionsResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Checkout encontrado }
+        '404': { description: Checkout não encontrado }
   /v1/checkouts/{checkoutId}/confirm:
     post:
       tags: [CheckoutService]
-      summary: Confirma checkout e publica checkout.confirmed
-      operationId: confirmCheckout
+      summary: Confirma checkout
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/CheckoutId'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ConfirmCheckoutRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Checkout confirmado. Evento checkout.confirmed publicado via Outbox.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CheckoutResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Checkout confirmado }
+        '400': { description: Header Idempotency-Key ausente ou payload inválido }
 
-  # ── ShippingPromiseService ─────────────────────────────────────────────────
   /v1/shipping-promises:
     post:
       tags: [ShippingPromiseService]
       summary: Calcula promessa de entrega
-      operationId: calculateShippingPromise
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ShippingPromiseRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Promessa calculada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShippingPromiseResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Promessa calculada }
+        '400': { description: Request inválido }
+  /v1/shipping-promises/{promiseId}:
+    get:
+      tags: [ShippingPromiseService]
+      summary: Consulta promessa calculada
+      parameters:
+        - { name: promiseId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Promessa encontrada }
+        '404': { description: Promessa não encontrada }
 
-  # ── InventoryService ───────────────────────────────────────────────────────
+  /v1/products/logistics/batch:
+    get:
+      tags: [ProductCatalogService]
+      summary: Consulta atributos logísticos de múltiplos SKUs
+      parameters:
+        - { name: skuIds, in: query, required: true, schema: { type: array, items: { type: string, format: uuid } }, style: form, explode: true }
+      responses:
+        '200': { description: Atributos logísticos retornados }
+  /v1/products/{skuId}/logistics:
+    get:
+      tags: [ProductCatalogService]
+      summary: Consulta atributos logísticos de um SKU
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      responses:
+        '200': { description: SKU encontrado }
+        '404': { description: SKU não encontrado }
+
   /v1/inventory/availability/batch:
     post:
       tags: [InventoryService]
       summary: Consulta disponibilidade em lote
-      operationId: getInventoryAvailabilityBatch
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/InventoryAvailabilityBatchRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Saldos encontrados
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/InventoryAvailabilityResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Disponibilidade retornada }
   /v1/inventory/{sellerId}/{skuId}:
     get:
       tags: [InventoryService]
       summary: Consulta disponibilidade de SKU por seller
-      operationId: getInventoryBySku
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/SellerId'
+        - { name: sellerId, in: path, required: true, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/SkuId'
       responses:
-        '200':
-          description: Saldos por fulfillment center
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/InventoryAvailabilityResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Disponibilidade retornada }
   /v1/inventory/reservations:
     post:
       tags: [InventoryService]
       summary: Cria reserva de estoque
-      operationId: createInventoryReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateInventoryReservationRequest' }
+            schema: { type: object }
       responses:
-        '201':
-          description: Reserva criada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '201': { description: Reserva criada }
+        '400': { description: Idempotency-Key ausente }
   /v1/inventory/reservations/{reservationId}/confirm:
     post:
       tags: [InventoryService]
       summary: Confirma reserva de estoque
-      operationId: confirmInventoryReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ReservationId'
       responses:
-        '200':
-          description: Reserva confirmada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Reserva confirmada }
   /v1/inventory/reservations/{reservationId}/release:
     post:
       tags: [InventoryService]
       summary: Libera reserva de estoque
-      operationId: releaseInventoryReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ReservationId'
       responses:
-        '200':
-          description: Reserva liberada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/InventoryReservationResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Reserva liberada }
   /v1/inventory/adjustments:
     post:
       tags: [InventoryService]
-      summary: Ajusta estoque físico
-      operationId: adjustInventory
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Ajusta estoque
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/InventoryAdjustmentRequest' }
+            schema: { type: object }
       responses:
         '202': { description: Ajuste aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
 
-  # ── FulfillmentCenterService ───────────────────────────────────────────────
-  /v1/fulfillment-centers/candidates/search:
+  /fulfillment-centers/candidates/search:
     post:
       tags: [FulfillmentCenterService]
-      summary: Busca fulfillment centers candidatos
-      operationId: searchFulfillmentCandidates
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Busca centros candidatos
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/FulfillmentCandidatesRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Centros candidatos
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/FulfillmentCandidateResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/fulfillment-centers/{fulfillmentCenterId}/capacity:
+        '200': { description: Centros candidatos }
+  /fulfillment-centers/{fulfillmentCenterId}/capacity:
     put:
       tags: [FulfillmentCenterService]
-      summary: Configura capacidade operacional
-      operationId: updateFulfillmentCapacity
+      summary: Configura capacidade de fulfillment center
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/FulfillmentCenterId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateFulfillmentCapacityRequest' }
+            schema: { type: object }
       responses:
-        '204': { description: Capacidade atualizada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/fulfillment-centers/{fulfillmentCenterId}/status:
+        '204': { description: Capacidade configurada }
+  /fulfillment-centers/{fulfillmentCenterId}/status:
     patch:
       tags: [FulfillmentCenterService]
-      summary: Altera status operacional do fulfillment center
-      operationId: updateFulfillmentStatus
+      summary: Altera status de fulfillment center
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/FulfillmentCenterId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateFulfillmentStatusRequest' }
+            schema: { type: object }
       responses:
-        '204': { description: Status atualizado }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/capacity-reservations:
+        '204': { description: Status alterado }
+  /capacity-reservations/:
     post:
       tags: [FulfillmentCenterService]
       summary: Cria reserva de capacidade
-      operationId: createCapacityReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CreateCapacityReservationRequest' }
+            schema: { type: object }
       responses:
-        '201':
-          description: Reserva criada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/capacity-reservations/{reservationId}/confirm:
+        '201': { description: Reserva criada }
+        '400': { description: Idempotency-Key ausente }
+  /capacity-reservations/{reservationId}/confirm:
     post:
       tags: [FulfillmentCenterService]
       summary: Confirma reserva de capacidade
-      operationId: confirmCapacityReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ReservationId'
       responses:
-        '200':
-          description: Reserva confirmada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/capacity-reservations/{reservationId}/release:
+        '200': { description: Reserva confirmada }
+  /capacity-reservations/{reservationId}/release:
     post:
       tags: [FulfillmentCenterService]
       summary: Libera reserva de capacidade
-      operationId: releaseCapacityReservation
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ReservationId'
       responses:
-        '200':
-          description: Reserva liberada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CapacityReservationResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Reserva liberada }
 
-  # ── RoutingService ─────────────────────────────────────────────────────────
-  /v1/routes/search:
+  /v1/routes/calculate:
     post:
       tags: [RoutingService]
-      summary: Busca rotas logísticas disponíveis
-      operationId: searchRoutes
+      summary: Calcula rotas disponíveis
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RouteSearchRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Rotas encontradas
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RouteSearchResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-        '503':
-          description: Grafo ainda não carregado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-
-  /v1/network/nodes:
-    post:
-      tags: [RoutingService]
-      summary: Cria nó logístico
-      operationId: createLogisticsNode
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateLogisticsNodeRequest' }
-      responses:
-        '201': { description: Nó criado }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/network/lanes:
-    post:
-      tags: [RoutingService]
-      summary: Cria lane logística
-      operationId: createLogisticsLane
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateLogisticsLaneRequest' }
-      responses:
-        '201': { description: Lane criada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/network/lanes/{laneId}:
-    put:
-      tags: [RoutingService]
-      summary: Atualiza lane logística
-      operationId: updateLogisticsLane
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: laneId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateLogisticsLaneRequest' }
-      responses:
-        '200': { description: Lane atualizada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  # ── CarrierService ─────────────────────────────────────────────────────────
-  /v1/carriers:
-    post:
-      tags: [CarrierService]
-      summary: Cria transportadora
-      operationId: createCarrier
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateCarrierRequest' }
-      responses:
-        '201': { description: Transportadora criada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/carriers/{carrierCode}:
+        '200': { description: Rotas calculadas }
+        '400': { description: Request inválido }
+        '503': { description: Grafo indisponível }
+  /v1/routes/{routeId}:
     get:
-      tags: [CarrierService]
-      summary: Consulta perfil de transportadora
-      operationId: getCarrier
+      tags: [RoutingService]
+      summary: Consulta rota calculada
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CarrierCode'
+        - { name: routeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200':
-          description: Perfil encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CarrierProfileResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/carriers/{carrierCode}/status:
-    patch:
-      tags: [CarrierService]
-      summary: Altera status de transportadora
-      operationId: updateCarrierStatus
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CarrierCode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/UpdateCarrierStatusRequest' }
-      responses:
-        '204': { description: Status atualizado }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/carriers/{carrierCode}/webhooks/status:
-    post:
-      tags: [CarrierService]
-      summary: Recebe webhook de status externo de transportadora
-      operationId: receiveCarrierWebhook
-      security: []
-      parameters:
-        - $ref: '#/components/parameters/CarrierCode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CarrierStatusWebhookRequest' }
-      responses:
-        '202': { description: Webhook aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/carriers/{carrierCode}/service-levels:
-    post:
-      tags: [CarrierService]
-      summary: Adiciona nível de serviço
-      operationId: createCarrierServiceLevel
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CarrierCode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateCarrierServiceLevelRequest' }
-      responses:
-        '201': { description: Nível criado }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/carriers/{carrierCode}/lanes:
-    post:
-      tags: [CarrierService]
-      summary: Adiciona rota operacional da transportadora
-      operationId: createCarrierLane
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/CarrierCode'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateCarrierLaneRequest' }
-      responses:
-        '201': { description: Lane criada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Rota encontrada }
+        '404': { description: Rota não encontrada }
 
   /v1/carrier-availability/search:
     post:
       tags: [CarrierService]
-      summary: Consulta disponibilidade de transportadora em lote
-      operationId: searchCarrierAvailability
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Busca disponibilidade de transportadoras
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CarrierAvailabilitySearchRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Resultado de disponibilidade
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/CarrierAvailabilitySearchResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Disponibilidade retornada }
+  /v1/carriers:
+    post:
+      tags: [CarrierService]
+      summary: Cria carrier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Carrier criado }
+  /v1/carriers/{carrierCode}:
+    get:
+      tags: [CarrierService]
+      summary: Consulta carrier
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      responses:
+        '200': { description: Carrier encontrado }
+        '404': { description: Carrier não encontrado }
+  /v1/carriers/{carrierCode}/status:
+    patch:
+      tags: [CarrierService]
+      summary: Altera status do carrier
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '204': { description: Status alterado }
+  /v1/carriers/{carrierCode}/webhooks/status:
+    post:
+      tags: [CarrierService]
+      summary: Recebe webhook de status de carrier
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '202': { description: Webhook aceito }
+  /v1/carriers/{carrierCode}/service-levels:
+    post:
+      tags: [CarrierService]
+      summary: Cria service level de carrier
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Service level criado }
+        '404': { description: Carrier não encontrado }
+  /v1/carriers/{carrierCode}/lanes:
+    post:
+      tags: [CarrierService]
+      summary: Cria lane de carrier
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Lane criada }
+        '404': { description: Carrier ou service level não encontrado }
 
-  # ── ShippingPricingService ─────────────────────────────────────────────────
-  /v1/shipping-prices/quotes/batch:
+  /v1/pricing/freight:
     post:
       tags: [ShippingPricingService]
-      summary: Calcula cotações de frete para candidatos de rota
-      operationId: calculateShippingPrices
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Calcula frete
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/BatchShippingPriceRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Cotações calculadas
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BatchShippingPriceResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/shipping-prices/quotes/{quoteId}:
+        '200': { description: Frete calculado }
+        '422': { description: Frete indisponível }
+  /shipping-prices/quotes/batch:
+    post:
+      tags: [ShippingPricingService]
+      summary: Calcula quotes em lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Quotes retornados }
+  /shipping-prices/quotes/{quoteId}:
     get:
       tags: [ShippingPricingService]
-      summary: Recupera cotação em cache
-      operationId: getShippingPriceQuote
+      summary: Consulta quote de frete
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: quoteId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - { name: quoteId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200':
-          description: Cotação encontrada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShippingPriceQuoteResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/rate-cards:
+        '200': { description: Quote encontrado }
+        '404': { description: Quote não encontrado }
+  /rate-cards:
     post:
       tags: [ShippingPricingService]
-      summary: Cria rate card em rascunho
-      operationId: createRateCard
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Cria rate card
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RateCardRequest' }
+            schema: { type: object }
       responses:
-        '201':
-          description: Rate card criado em status Draft
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RateCardResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/rate-cards/{rateCardId}:
+        '201': { description: Rate card criado }
+  /rate-cards/{rateCardId}:
     put:
       tags: [ShippingPricingService]
-      summary: Atualiza rate card em rascunho
-      operationId: updateRateCard
+      summary: Atualiza rate card
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: rateCardId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RateCardRequest' }
+            schema: { type: object }
       responses:
-        '200':
-          description: Rate card atualizado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RateCardResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/rate-cards/{rateCardId}/activate:
+        '200': { description: Rate card atualizado }
+  /rate-cards/{rateCardId}/activate:
     post:
       tags: [ShippingPricingService]
       summary: Ativa rate card
-      operationId: activateRateCard
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: rateCardId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200':
-          description: Rate card ativado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RateCardResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/rate-cards/{rateCardId}/retire:
+        '200': { description: Rate card ativado }
+  /rate-cards/{rateCardId}/retire:
     post:
       tags: [ShippingPricingService]
       summary: Aposenta rate card
-      operationId: retireRateCard
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: rateCardId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200':
-          description: Rate card aposentado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RateCardResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '200': { description: Rate card aposentado }
 
-  # ── OrderService ───────────────────────────────────────────────────────────
-  /v1/orders:
-    post:
-      tags: [OrderService]
-      summary: Cria pedido a partir de checkout confirmado
-      description: >-
-        Endpoint interno acionado pelo processador de eventos (Outbox/Saga) após consumo
-        do evento checkout.confirmed. Idempotente via x-idempotency-key (usa checkoutId).
-        Inicia a saga de reservas (estoque + capacidade) e autorização de pagamento.
-      operationId: createOrder
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
-      responses:
-        '201':
-          description: Pedido criado. Saga iniciada.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OrderResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/UnprocessableEntity' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/orders/{orderId}:
+  /orders/{orderId}:
     get:
       tags: [OrderService]
       summary: Consulta pedido
-      operationId: getOrder
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/OrderId'
       responses:
-        '200':
-          description: Pedido encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OrderResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/orders/{orderId}/cancel:
+        '200': { description: Pedido encontrado }
+        '404': { description: Pedido não encontrado }
+  /orders/{orderId}/cancel:
     post:
       tags: [OrderService]
       summary: Cancela pedido
-      operationId: cancelOrder
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/OrderId'
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CancelOrderRequest' }
+            schema: { type: object }
       responses:
         '202': { description: Cancelamento aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '400': { description: Idempotency-Key ausente }
 
-  # ── ShipmentService ────────────────────────────────────────────────────────
-  /v1/shipments/{shipmentId}:
+  /shipments/{shipmentId}:
     get:
       tags: [ShipmentService]
-      summary: Consulta remessa
-      operationId: getShipment
+      summary: Consulta shipment
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ShipmentId'
       responses:
-        '200':
-          description: Remessa encontrada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShipmentResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/shipments/{shipmentId}/label:
+        '200': { description: Shipment encontrado }
+        '404': { description: Shipment não encontrado }
+  /shipments/{shipmentId}/label:
     get:
       tags: [ShipmentService]
-      summary: Gera URL temporária para etiqueta
-      operationId: getShipmentLabel
+      summary: Consulta URL temporária da etiqueta
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ShipmentId'
       responses:
-        '200':
-          description: URL temporária gerada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ShipmentLabelResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/shipments/{shipmentId}/cancel:
+        '200': { description: URL da etiqueta }
+        '404': { description: Etiqueta não encontrada }
+  /shipments/{shipmentId}/cancel:
     post:
       tags: [ShipmentService]
-      summary: Solicita cancelamento de remessa
-      operationId: cancelShipment
+      summary: Solicita cancelamento de shipment
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
         - $ref: '#/components/parameters/ShipmentId'
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '202': { description: Cancelamento aceito }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  # ── TrackingService ────────────────────────────────────────────────────────
-  /v1/tracking/shipments/{shipmentId}:
-    get:
-      tags: [TrackingService]
-      summary: Consulta tracking por shipmentId
-      operationId: getTrackingByShipment
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/ShipmentId'
-      responses:
-        '200':
-          description: Tracking encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TrackingResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '400': { description: Idempotency-Key ausente }
+        '404': { description: Shipment não encontrado }
+        '409': { description: Estado inválido para cancelamento }
 
   /v1/tracking/{trackingCode}:
     get:
       tags: [TrackingService]
-      summary: Consulta tracking por código de rastreio (endpoint público)
-      operationId: getTrackingByCode
-      security: []
+      summary: Consulta tracking por código
       parameters:
-        - name: trackingCode
-          in: path
-          required: true
-          schema: { type: string }
+        - { name: trackingCode, in: path, required: true, schema: { type: string } }
       responses:
-        '200':
-          description: Tracking encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TrackingResponse' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/tracking/shipments/{shipmentId}/events:
+        '200': { description: Tracking encontrado }
+        '404': { description: Tracking não encontrado }
+  /v1/tracking/shipments/{shipmentId}:
     get:
       tags: [TrackingService]
-      summary: Consulta histórico de eventos de tracking
-      operationId: getTrackingEvents
+      summary: Consulta tracking por shipmentId
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200': { description: Tracking encontrado }
+        '404': { description: Tracking não encontrado }
+  /v1/tracking/events:
+    post:
+      tags: [TrackingService]
+      summary: Recebe evento de tracking de carrier
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/ShipmentId'
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-        - name: before
-          in: query
-          required: false
-          schema: { type: string, format: date-time }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
       responses:
-        '200':
-          description: Eventos de tracking
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/TrackingEventResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
+        '202': { description: Evento aceito }
+        '400': { description: Evento inválido }
 
-  # ── NotificationService ────────────────────────────────────────────────────
   /v1/notifications/{notificationId}:
     get:
       tags: [NotificationService]
       summary: Consulta notificação
-      operationId: getNotification
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: notificationId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - { name: notificationId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200':
-          description: Notificação encontrada
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/NotificationResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '200': { description: Notificação encontrada }
+        '404': { description: Notificação não encontrada }
   /v1/notifications/tracking-status-changed:
     post:
       tags: [NotificationService]
-      summary: Recebe evento de alteração de tracking
-      operationId: receiveTrackingStatusChanged
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+      summary: Planeja notificação a partir de mudança de tracking recebida por HTTP
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/TrackingStatusChangedEvent' }
+            schema: { type: object }
       responses:
         '202': { description: Evento aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
   /v1/notification-preferences/{recipientId}/{type}/{channel}:
     put:
       tags: [NotificationService]
       summary: Cria ou atualiza preferência de notificação
-      operationId: upsertNotificationPreference
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: recipientId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-        - name: type
-          in: path
-          required: true
-          schema: { type: string }
-        - name: channel
-          in: path
-          required: true
-          schema: { type: string, enum: [Email, Sms, Push] }
+        - { name: recipientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: type, in: path, required: true, schema: { type: string } }
+        - { name: channel, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [enabled]
-              properties:
-                enabled: { type: boolean }
+            schema: { type: object }
       responses:
-        '204': { description: Preferência atualizada }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
+        '204': { description: Preferência salva }
   /v1/providers/{provider}/receipts:
     post:
       tags: [NotificationService]
-      summary: Recebe receipt de provider de notificação
-      operationId: receiveProviderReceipt
-      security: []
+      summary: Recebe receipt de provider externo
       parameters:
-        - name: provider
-          in: path
-          required: true
-          schema: { type: string }
+        - { name: provider, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ProviderReceiptRequest' }
+            schema: { type: object }
       responses:
         '202': { description: Receipt aceito }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  # ── AuditService ───────────────────────────────────────────────────────────
-  /v1/audit/events:
-    get:
-      tags: [AuditService]
-      summary: Lista eventos de auditoria com filtros
-      operationId: listAuditEvents
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: entityType
-          in: query
-          required: false
-          description: Tipo da entidade auditada (ex. Order, Checkout, Shipment)
-          schema: { type: string }
-        - name: entityId
-          in: query
-          required: false
-          schema: { type: string, format: uuid }
-        - name: actorId
-          in: query
-          required: false
-          schema: { type: string }
-        - name: eventType
-          in: query
-          required: false
-          schema: { type: string }
-        - name: from
-          in: query
-          required: false
-          schema: { type: string, format: date-time }
-        - name: to
-          in: query
-          required: false
-          schema: { type: string, format: date-time }
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-      responses:
-        '200':
-          description: Eventos de auditoria
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items: { $ref: '#/components/schemas/AuditEventResponse' }
-                  pagination:
-                    type: object
-                    properties:
-                      page: { type: integer }
-                      pageSize: { type: integer }
-                      total: { type: integer }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
-
-  /v1/audit/events/{auditEventId}:
-    get:
-      tags: [AuditService]
-      summary: Consulta evento de auditoria por ID
-      operationId: getAuditEvent
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - name: auditEventId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: Evento de auditoria encontrado
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AuditEventResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '500': { $ref: '#/components/responses/InternalServerError' }
 
 components:
-
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: >-
-        JWT emitido pelo Authorization Service via OAuth2 Client Credentials (M2M).
-        Escopos exigidos variam por operação (ex. envios:read, envios:write, audit:read).
-        Header: Authorization: Bearer <token>
-
   parameters:
-    IdempotencyKey:
-      name: x-idempotency-key
-      in: header
-      required: true
-      description: Chave de idempotência para operações de escrita. UUID v4 recomendado.
-      schema: { type: string, format: uuid }
     CorrelationId:
-      name: x-correlation-id
+      name: X-Correlation-Id
       in: header
       required: false
-      description: ID de correlação para rastreio distribuído. Gerado pelo caller se ausente.
-      schema: { type: string, format: uuid }
-    QueryText:
-      name: query
-      in: query
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
       required: true
-      schema: { type: string, minLength: 1 }
-    Page:
-      name: page
-      in: query
-      required: false
-      schema: { type: integer, minimum: 1, default: 1 }
-    PageSize:
-      name: pageSize
-      in: query
-      required: false
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-    SkuId:
-      name: skuId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
-    SellerId:
-      name: sellerId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
+      schema: { type: string }
     CheckoutId:
       name: checkoutId
       in: path
       required: true
       schema: { type: string, format: uuid }
-    OrderId:
-      name: orderId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
-    ShipmentId:
-      name: shipmentId
+    SkuId:
+      name: skuId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1697,964 +632,13 @@ components:
       in: path
       required: true
       schema: { type: string }
-
-  responses:
-    BadRequest:
-      description: Requisição inválida — parâmetros ou corpo com formato incorreto
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Unauthorized:
-      description: Token ausente, expirado ou inválido
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Forbidden:
-      description: Token válido mas sem permissão para o recurso solicitado
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    NotFound:
-      description: Recurso não encontrado
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Conflict:
-      description: Conflito de estado — recurso já existe ou transição de status inválida
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    UnprocessableEntity:
-      description: Dados sintaticamente corretos mas semanticamente inválidos
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    InternalServerError:
-      description: Erro interno do servidor
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-
-  schemas:
-
-    ErrorResponse:
-      type: object
-      required: [code, message]
-      properties:
-        code:
-          type: string
-          description: Código de erro da aplicação
-          example: CHECKOUT_NOT_FOUND
-        message:
-          type: string
-          description: Mensagem legível ao desenvolvedor
-        details:
-          type: array
-          items:
-            type: object
-            properties:
-              field: { type: string }
-              message: { type: string }
-        correlationId: { type: string, format: uuid }
-        traceId: { type: string }
-
-    HealthResponse:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, enum: [Healthy, Degraded, Unhealthy] }
-        checks:
-          type: array
-          items:
-            type: object
-            properties:
-              name: { type: string }
-              status: { type: string, enum: [Healthy, Degraded, Unhealthy] }
-              description: { type: string, nullable: true }
-              durationMs: { type: integer }
-
-    Address:
-      type: object
-      required: [zipCode, city, state, country]
-      properties:
-        zipCode: { type: string }
-        city: { type: string }
-        state: { type: string }
-        country: { type: string, example: BR }
-
-    Dimensions:
-      type: object
-      required: [heightCm, widthCm, lengthCm]
-      properties:
-        heightCm: { type: number, format: double, minimum: 0 }
-        widthCm: { type: number, format: double, minimum: 0 }
-        lengthCm: { type: number, format: double, minimum: 0 }
-
-    PackageProfile:
-      type: object
-      properties:
-        weightKg: { type: number, format: double }
-        cubicWeightKg: { type: number, format: double }
-        actualWeightKg: { type: number, format: double }
-        totalWeightKg: { type: number, format: double }
-        heightCm: { type: number, format: double }
-        widthCm: { type: number, format: double }
-        lengthCm: { type: number, format: double }
-        isFragile: { type: boolean }
-        isRestricted: { type: boolean }
-        hasFragileItem: { type: boolean }
-        hasRestrictedItem: { type: boolean }
-        category: { type: string, nullable: true }
-
-    ProductCardResponse:
-      type: object
-      properties:
-        productId: { type: string }
-        title: { type: string }
-        imageUrl: { type: string, format: uri }
-        price: { type: number, format: double }
-        sellerId: { type: string }
-        availableQuantity: { type: integer }
-        rating: { type: number, format: double, nullable: true }
-        freeShipping: { type: boolean }
-        fulfillment: { type: boolean }
-        shippingPromise: { type: string, nullable: true }
-
-    ProductSearchResponse:
-      type: object
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/ProductCardResponse' }
-        pagination:
-          type: object
-          properties:
-            page: { type: integer }
-            pageSize: { type: integer }
-            total: { type: integer }
-
-    CreateProductRequest:
-      type: object
-      required: [sellerId, skuId, title, category, price, dimensions, weightKg]
-      properties:
-        sellerId: { type: string, format: uuid }
-        skuId: { type: string, format: uuid }
-        title: { type: string }
-        category: { type: string }
-        price: { type: number, format: double }
-        dimensions: { $ref: '#/components/schemas/Dimensions' }
-        weightKg: { type: number, format: double }
-        isFragile: { type: boolean, default: false }
-        isRestricted: { type: boolean, default: false }
-
-    ProductResponse:
-      type: object
-      properties:
-        skuId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        title: { type: string }
-        category: { type: string }
-        price: { type: number, format: double }
-        status: { type: string, enum: [Draft, Active, Paused, Blocked, Deleted] }
-        weightKg: { type: number, format: double }
-        heightCm: { type: number, format: double }
-        widthCm: { type: number, format: double }
-        lengthCm: { type: number, format: double }
-        isFragile: { type: boolean }
-        isRestricted: { type: boolean }
-        availableForSale: { type: boolean }
-
-    ProductPhysicalInfoBatchRequest:
-      type: object
-      required: [skuIds]
-      properties:
-        skuIds:
-          type: array
-          minItems: 1
-          maxItems: 100
-          items: { type: string, format: uuid }
-
-    ProductPhysicalInfoResponse:
-      type: object
-      properties:
-        skuId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        weightKg: { type: number, format: double }
-        heightCm: { type: number, format: double }
-        widthCm: { type: number, format: double }
-        lengthCm: { type: number, format: double }
-        category: { type: string }
-        isFragile: { type: boolean }
-        isRestricted: { type: boolean }
-        status: { type: string, enum: [Draft, Active, Paused, Blocked, Deleted] }
-
-    UpdateProductPhysicalInfoRequest:
-      type: object
-      required: [weightKg, dimensions]
-      properties:
-        weightKg: { type: number, format: double }
-        dimensions: { $ref: '#/components/schemas/Dimensions' }
-        isFragile: { type: boolean }
-        isRestricted: { type: boolean }
-
-    UpdateProductStatusRequest:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, enum: [Draft, Active, Paused, Blocked, Deleted] }
-
-    CheckoutItemRequest:
-      type: object
-      required: [skuId, quantity]
-      properties:
-        skuId: { type: string, format: uuid }
-        quantity: { type: integer, minimum: 1 }
-        unitPrice: { type: number, format: double }
-
-    CreateCheckoutRequest:
-      type: object
-      required: [buyerId, sellerId, shippingAddress, items]
-      properties:
-        buyerId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        shippingAddress: { $ref: '#/components/schemas/Address' }
-        items:
-          type: array
-          minItems: 1
-          items: { $ref: '#/components/schemas/CheckoutItemRequest' }
-
-    BffCreateCheckoutRequest:
-      allOf:
-        - $ref: '#/components/schemas/CreateCheckoutRequest'
-        - type: object
-          properties:
-            paymentMethodId: { type: string }
-
-    ConfirmCheckoutRequest:
-      type: object
-      required: [paymentIntentId]
-      properties:
-        paymentIntentId: { type: string }
-        selectedPromiseId: { type: string, nullable: true }
-
-    BffConfirmCheckoutRequest:
-      type: object
-      properties:
-        paymentToken: { type: string }
-        promiseId: { type: string }
-
-    ShippingOption:
-      type: object
-      properties:
-        promiseId: { type: string, nullable: true }
-        mode:
-          type: string
-          nullable: true
-          enum: [FULFILLMENT, FLEX, CROSSDOCKING, SELLERSHIPPING, CARRIER, null]
-        carrier: { type: string, nullable: true }
-        estimatedDeliveryDate: { type: string, format: date, nullable: true }
-        cost: { type: number, format: double, nullable: true }
-        label: { type: string, nullable: true }
-
-    ShippingOptionsResponse:
-      type: object
-      properties:
-        checkoutId: { type: string, format: uuid }
-        quoteStatus:
-          type: string
-          enum: [Pending, Calculated, Failed]
-          description: Pending enquanto o evento shipping.promise.calculated ainda não chegou
-        options:
-          type: array
-          items: { $ref: '#/components/schemas/ShippingOption' }
-        calculatedAt: { type: string, format: date-time, nullable: true }
-
-    CheckoutResponse:
-      type: object
-      properties:
-        checkoutId: { type: string, format: uuid }
-        status: { type: string, enum: [Created, Confirmed, Expired, Cancelled] }
-        itemsTotal: { type: number, format: double }
-        shippingCost: { type: number, format: double }
-        totalAmount: { type: number, format: double }
-        shippingOption: { $ref: '#/components/schemas/ShippingOption' }
-        expiresAt: { type: string, format: date-time }
-        createdAt: { type: string, format: date-time }
-
-    BffCheckoutResponse:
-      type: object
-      properties:
-        checkoutId: { type: string, format: uuid }
-        status: { type: string, enum: [Created, Confirmed, Expired, Cancelled] }
-        itemsTotal: { type: number, format: double }
-        shippingPrice: { type: number, format: double }
-        totalAmount: { type: number, format: double }
-        currency: { type: string, example: BRL }
-        selectedShipping: { $ref: '#/components/schemas/ShippingOption' }
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/CheckoutItemRequest' }
-        expiresAt: { type: string, format: date-time }
-
-    ShippingPromiseItem:
-      type: object
-      required: [skuId, quantity, unitPrice]
-      properties:
-        skuId: { type: string, format: uuid }
-        quantity: { type: integer, minimum: 1 }
-        unitPrice: { type: number, format: double }
-
-    ShippingPromiseRequest:
-      type: object
-      required: [buyerId, sellerId, destination, items]
-      properties:
-        buyerId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        destination: { $ref: '#/components/schemas/Address' }
-        items:
-          type: array
-          minItems: 1
-          items: { $ref: '#/components/schemas/ShippingPromiseItem' }
-
-    ShippingPromiseResponse:
-      type: object
-      properties:
-        available: { type: boolean }
-        promiseId: { type: string, nullable: true }
-        mode:
-          type: string
-          nullable: true
-          enum: [FULFILLMENT, FLEX, CROSSDOCKING, SELLERSHIPPING, CARRIER, null]
-        carrier: { type: string, nullable: true }
-        estimatedDeliveryDate: { type: string, format: date, nullable: true }
-        cost: { type: number, format: double, nullable: true }
-        source: { type: string, enum: [Calculated, Cache, Fallback] }
-        unavailableReason: { type: string, nullable: true }
-
-    InventoryAvailabilityBatchRequest:
-      type: object
-      required: [sellerId, skuIds]
-      properties:
-        sellerId: { type: string, format: uuid }
-        skuIds:
-          type: array
-          minItems: 1
-          maxItems: 100
-          items: { type: string, format: uuid }
-
-    InventoryAvailabilityResponse:
-      type: object
-      properties:
-        sellerId: { type: string, format: uuid }
-        skuId: { type: string, format: uuid }
-        fulfillmentCenterId: { type: string, format: uuid }
-        onHandQuantity: { type: integer }
-        reservedQuantity: { type: integer }
-        availableQuantity: { type: integer }
-
-    CreateInventoryReservationRequest:
-      type: object
-      required: [checkoutId, sellerId, items]
-      properties:
-        checkoutId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        items:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required: [skuId, fulfillmentCenterId, quantity]
-            properties:
-              skuId: { type: string, format: uuid }
-              fulfillmentCenterId: { type: string, format: uuid }
-              quantity: { type: integer, minimum: 1 }
-
-    InventoryReservationResponse:
-      type: object
-      properties:
-        reservationId: { type: string, format: uuid }
-        checkoutId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        status: { type: string, enum: [Pending, Confirmed, Released, Expired] }
-        expiresAt: { type: string, format: date-time }
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              skuId: { type: string, format: uuid }
-              fulfillmentCenterId: { type: string, format: uuid }
-              quantity: { type: integer }
-
-    InventoryAdjustmentRequest:
-      type: object
-      required: [sellerId, skuId, fulfillmentCenterId, quantityDelta, reason]
-      properties:
-        sellerId: { type: string, format: uuid }
-        skuId: { type: string, format: uuid }
-        fulfillmentCenterId: { type: string, format: uuid }
-        quantityDelta: { type: integer }
-        reason: { type: string }
-
-    FulfillmentCandidatesRequest:
-      type: object
-      required: [sellerId, destinationPostalCode, mode, package]
-      properties:
-        sellerId: { type: string, format: uuid }
-        destinationPostalCode: { type: string }
-        mode: { type: string, enum: [FULFILLMENT, FLEX, CROSSDOCKING, SELLERSHIPPING, CARRIER] }
-        package: { $ref: '#/components/schemas/PackageProfile' }
-        requestedAtUtc: { type: string, format: date-time }
-
-    FulfillmentCandidateResponse:
-      type: object
-      properties:
-        fulfillmentCenterId: { type: string, format: uuid }
-        code: { type: string }
-        name: { type: string }
-        region: { type: string }
-        mode: { type: string }
-        processingDate: { type: string, format: date }
-        cutoffAt: { type: string, format: date-time }
-        availableCapacityUnits: { type: integer }
-        utilizationPercentage: { type: number }
-        score: { type: number }
-
-    UpdateFulfillmentCapacityRequest:
-      type: object
-      required: [operationDate, mode, totalCapacityUnits]
-      properties:
-        operationDate: { type: string, format: date }
-        mode: { type: string }
-        totalCapacityUnits: { type: integer, minimum: 0 }
-
-    UpdateFulfillmentStatusRequest:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, enum: [Active, Suspended, Maintenance] }
-        reason: { type: string }
-
-    CreateCapacityReservationRequest:
-      type: object
-      required: [orderId, fulfillmentCenterId, operationDate, mode, requiredCapacityUnits]
-      properties:
-        orderId: { type: string, format: uuid }
-        fulfillmentCenterId: { type: string, format: uuid }
-        operationDate: { type: string, format: date }
-        mode: { type: string }
-        requiredCapacityUnits: { type: integer, minimum: 1 }
-
-    CapacityReservationResponse:
-      type: object
-      properties:
-        reservationId: { type: string, format: uuid }
-        orderId: { type: string, format: uuid }
-        fulfillmentCenterId: { type: string, format: uuid }
-        operationDate: { type: string, format: date }
-        mode: { type: string }
-        reservedCapacityUnits: { type: integer }
-        status: { type: string, enum: [Pending, Confirmed, Released, Expired] }
-        expiresAt: { type: string, format: date-time }
-
-    RouteSearchRequest:
-      type: object
-      required: [originNodeId, destinationPostalCode, package]
-      properties:
-        originNodeId: { type: string, format: uuid }
-        destinationPostalCode: { type: string }
-        package: { $ref: '#/components/schemas/PackageProfile' }
-        requestedAtUtc: { type: string, format: date-time }
-        maxOptions: { type: integer, minimum: 1, maximum: 5, default: 3 }
-
-    RouteSearchResponse:
-      type: object
-      properties:
-        networkVersion: { type: integer }
-        source: { type: string, enum: [Cache, Live] }
-        routes:
-          type: array
-          items:
-            type: object
-            properties:
-              routeId: { type: string }
-              originNodeId: { type: string, format: uuid }
-              destinationNodeId: { type: string, format: uuid }
-              estimatedDepartureAt: { type: string, format: date-time }
-              estimatedArrivalAt: { type: string, format: date-time }
-              totalElapsedMinutes: { type: integer }
-              legs:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    laneId: { type: string, format: uuid }
-                    originNodeId: { type: string, format: uuid }
-                    originCode: { type: string }
-                    destinationNodeId: { type: string, format: uuid }
-                    destinationCode: { type: string }
-                    carrierCode: { type: string }
-                    mode: { type: string }
-                    departureAt: { type: string, format: date-time }
-                    arrivalAt: { type: string, format: date-time }
-                    transitMinutes: { type: integer }
-
-    CreateLogisticsNodeRequest:
-      type: object
-      required: [code, name, region, timeZoneId, type, handlingMinutes]
-      properties:
-        code: { type: string }
-        name: { type: string }
-        region: { type: string }
-        timeZoneId: { type: string }
-        type: { type: string, enum: [FC, HUB, CROSSDOCK, AGENCY] }
-        handlingMinutes: { type: integer, minimum: 0 }
-
-    CreateLogisticsLaneRequest:
-      type: object
-      required: [originNodeId, destinationNodeId, carrierCode, mode, transitMinutes, region]
-      properties:
-        originNodeId: { type: string, format: uuid }
-        destinationNodeId: { type: string, format: uuid }
-        carrierCode: { type: string }
-        mode: { type: string }
-        transitMinutes: { type: integer, minimum: 1 }
-        maximumWeightKg: { type: number }
-        maximumCubicWeightKg: { type: number }
-        supportsFragileItems: { type: boolean }
-        supportsRestrictedItems: { type: boolean }
-        region: { type: string }
-        schedules:
-          type: array
-          items:
-            type: object
-            properties:
-              dayOfWeek: { type: string, enum: [Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday] }
-              departureTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$' }
-              isActive: { type: boolean }
-
-    UpdateLogisticsLaneRequest:
-      allOf:
-        - $ref: '#/components/schemas/CreateLogisticsLaneRequest'
-
-    CreateCarrierRequest:
-      type: object
-      required: [code, name, requiresRealTimeValidation]
-      properties:
-        code: { type: string }
-        name: { type: string }
-        requiresRealTimeValidation: { type: boolean }
-
-    CarrierProfileResponse:
-      type: object
-      properties:
-        code: { type: string }
-        name: { type: string }
-        status: { type: string, enum: [Active, Degraded, Suspended, Maintenance, Inactive] }
-        requiresRealTimeValidation: { type: boolean }
-
-    UpdateCarrierStatusRequest:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, enum: [Active, Degraded, Suspended, Maintenance, Inactive] }
-        reason: { type: string }
-
-    CarrierStatusWebhookRequest:
-      type: object
-      required: [eventId, status, occurredAt]
-      properties:
-        eventId: { type: string }
-        status: { type: string }
-        reason: { type: string }
-        occurredAt: { type: string, format: date-time }
-        signature: { type: string }
-
-    CreateCarrierServiceLevelRequest:
-      type: object
-      required: [code, name, mode, maximumWeightKg, maximumCubicWeightKg]
-      properties:
-        code: { type: string }
-        name: { type: string }
-        mode: { type: string, enum: [FULFILLMENT, FLEX, CROSSDOCKING, SELLERSHIPPING, CARRIER] }
-        maximumWeightKg: { type: number, minimum: 0 }
-        maximumCubicWeightKg: { type: number, minimum: 0 }
-        supportsFragileItems: { type: boolean }
-        supportsRestrictedItems: { type: boolean }
-        priority: { type: integer, minimum: 1 }
-
-    CreateCarrierLaneRequest:
-      type: object
-      required: [serviceLevelCode, originNodeId, destinationNodeId, timeZoneId, cutoffTime, operatingDays]
-      properties:
-        serviceLevelCode: { type: string }
-        originNodeId: { type: string, format: uuid }
-        destinationNodeId: { type: string, format: uuid }
-        timeZoneId: { type: string }
-        cutoffTime: { type: string, pattern: '^([01]\d|2[0-3]):[0-5]\d$' }
-        operatingDays:
-          type: array
-          minItems: 1
-          items: { type: string, enum: [Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday] }
-
-    CarrierAvailabilitySearchRequest:
-      type: object
-      required: [checks]
-      properties:
-        checks:
-          type: array
-          minItems: 1
-          maxItems: 20
-          items:
-            type: object
-            required: [checkId, carrierCode, serviceLevelCode, originNodeId, destinationNodeId, destinationPostalCode, plannedDepartureAtUtc, package]
-            properties:
-              checkId: { type: string }
-              carrierCode: { type: string }
-              serviceLevelCode: { type: string }
-              originNodeId: { type: string, format: uuid }
-              destinationNodeId: { type: string, format: uuid }
-              destinationPostalCode: { type: string }
-              plannedDepartureAtUtc: { type: string, format: date-time }
-              package: { $ref: '#/components/schemas/PackageProfile' }
-
-    CarrierAvailabilitySearchResponse:
-      type: object
-      properties:
-        results:
-          type: array
-          items:
-            type: object
-            properties:
-              checkId: { type: string }
-              carrierCode: { type: string }
-              serviceLevelCode: { type: string }
-              available: { type: boolean }
-              reasonCode: { type: string, nullable: true }
-              source: { type: string, enum: [Local, External] }
-              evaluatedAt: { type: string, format: date-time }
-              validUntil: { type: string, format: date-time }
-
-    BatchShippingPriceRequest:
-      type: object
-      required: [buyerId, sellerId, destinationPostalCode, cartTotal, currency, candidates]
-      properties:
-        buyerId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        destinationPostalCode: { type: string }
-        cartTotal: { type: number, format: double }
-        currency: { type: string, example: BRL }
-        requestedAtUtc: { type: string, format: date-time }
-        candidates:
-          type: array
-          minItems: 1
-          maxItems: 20
-          items:
-            type: object
-            required: [candidateId, routeId, originNodeId, carrierCode, serviceLevelCode, package]
-            properties:
-              candidateId: { type: string }
-              routeId: { type: string }
-              originNodeId: { type: string, format: uuid }
-              carrierCode: { type: string }
-              serviceLevelCode: { type: string }
-              package: { $ref: '#/components/schemas/PackageProfile' }
-
-    ShippingPriceQuoteResponse:
-      type: object
-      properties:
-        candidateId: { type: string }
-        available: { type: boolean }
-        quoteId: { type: string, format: uuid, nullable: true }
-        routeId: { type: string }
-        currency: { type: string }
-        chargeableWeightKg: { type: number, nullable: true }
-        logisticsCost: { type: number, nullable: true }
-        customerPrice: { type: number, nullable: true }
-        platformSubsidy: { type: number, nullable: true }
-        sellerSubsidy: { type: number, nullable: true }
-        discount: { type: number, nullable: true }
-        adjustments:
-          type: array
-          items:
-            type: object
-            properties:
-              code: { type: string }
-              description: { type: string }
-              type: { type: string, enum: [Subsidy, Surcharge, Discount] }
-              amount: { type: number }
-        rateCardVersion: { type: integer, nullable: true }
-        source: { type: string, enum: [Calculated, Cache] }
-        expiresAt: { type: string, format: date-time, nullable: true }
-        unavailableReason: { type: string, nullable: true }
-
-    BatchShippingPriceResponse:
-      type: object
-      properties:
-        quotes:
-          type: array
-          items: { $ref: '#/components/schemas/ShippingPriceQuoteResponse' }
-
-    RateCardRequest:
-      type: object
-      required: [carrierCode, serviceLevelCode, region, validFrom, bands]
-      properties:
-        carrierCode: { type: string }
-        serviceLevelCode: { type: string }
-        region: { type: string }
-        currency: { type: string, default: BRL }
-        validFrom: { type: string, format: date }
-        validUntil: { type: string, format: date, nullable: true }
-        bands:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required: [weightUpToKg, pricePerKg, minimumPrice]
-            properties:
-              weightUpToKg: { type: number, minimum: 0 }
-              pricePerKg: { type: number, minimum: 0 }
-              minimumPrice: { type: number, minimum: 0 }
-              surcharges:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    code: { type: string }
-                    type: { type: string, enum: [Percentage, Fixed] }
-                    value: { type: number }
-
-    RateCardResponse:
-      allOf:
-        - $ref: '#/components/schemas/RateCardRequest'
-        - type: object
-          required: [rateCardId, version, status, createdAt]
-          properties:
-            rateCardId: { type: string, format: uuid }
-            version: { type: integer }
-            status: { type: string, enum: [Draft, Active, Retired] }
-            createdAt: { type: string, format: date-time }
-            activatedAt: { type: string, format: date-time, nullable: true }
-            retiredAt: { type: string, format: date-time, nullable: true }
-
-    CreateOrderRequest:
-      type: object
-      required: [checkoutId, buyerId, sellerId, shippingPromiseId, pricingQuoteId, items, totalAmount, currency]
-      properties:
-        checkoutId: { type: string, format: uuid }
-        buyerId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        shippingPromiseId: { type: string }
-        pricingQuoteId: { type: string, format: uuid }
-        shippingAddress: { $ref: '#/components/schemas/Address' }
-        items:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required: [skuId, quantity, unitPrice]
-            properties:
-              skuId: { type: string, format: uuid }
-              title: { type: string }
-              quantity: { type: integer, minimum: 1 }
-              unitPrice: { type: number, format: double }
-        itemsTotal: { type: number, format: double }
-        shippingPrice: { type: number, format: double }
-        totalAmount: { type: number, format: double }
-        currency: { type: string, example: BRL }
-
-    OrderResponse:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        checkoutId: { type: string, format: uuid }
-        buyerId: { type: string, format: uuid }
-        sellerId: { type: string, format: uuid }
-        status:
-          type: string
-          enum: [PendingReservations, ReservationsConfirmed, PendingPayment, PaymentAuthorized, Confirmed, CancellationRequested, Cancelled]
-        currency: { type: string }
-        itemsTotal: { type: number }
-        shippingPrice: { type: number }
-        totalAmount: { type: number }
-        shippingPromiseId: { type: string }
-        pricingQuoteId: { type: string, format: uuid }
-        inventoryReservationId: { type: string, format: uuid, nullable: true }
-        capacityReservationId: { type: string, format: uuid, nullable: true }
-        paymentAuthorizationId: { type: string, format: uuid, nullable: true }
-        shipmentId: { type: string, format: uuid, nullable: true }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        confirmedAt: { type: string, format: date-time, nullable: true }
-        cancelledAt: { type: string, format: date-time, nullable: true }
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              skuId: { type: string, format: uuid }
-              title: { type: string }
-              quantity: { type: integer }
-              unitPrice: { type: number }
-              totalPrice: { type: number }
-
-    CancelOrderRequest:
-      type: object
-      required: [reason]
-      properties:
-        reason: { type: string }
-        detail: { type: string, nullable: true }
-
-    ShipmentResponse:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        orderId: { type: string, format: uuid }
-        status:
-          type: string
-          enum: [Created, ReadyToPickup, InTransit, OutForDelivery, Delivered, DeliveryException, Cancelled]
-        carrierCode: { type: string }
-        serviceLevelCode: { type: string }
-        trackingCode: { type: string }
-        promisedDeliveryDate: { type: string, format: date }
-        createdAt: { type: string, format: date-time }
-        readyAt: { type: string, format: date-time, nullable: true }
-        packages:
-          type: array
-          items:
-            type: object
-            properties:
-              sequence: { type: integer }
-              weightKg: { type: number }
-              heightCm: { type: number }
-              widthCm: { type: number }
-              lengthCm: { type: number }
-              items:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    skuId: { type: string, format: uuid }
-                    quantity: { type: integer }
-
-    ShipmentLabelResponse:
-      type: object
-      required: [url, expiresInSeconds]
-      properties:
-        url: { type: string, format: uri }
-        expiresInSeconds: { type: integer }
-
-    TrackingLocation:
-      type: object
-      properties:
-        facilityCode: { type: string, nullable: true }
-        city: { type: string, nullable: true }
-        state: { type: string, nullable: true }
-        country: { type: string, nullable: true }
-
-    TrackingResponse:
-      type: object
-      properties:
-        shipmentId: { type: string, format: uuid }
-        trackingCode: { type: string }
-        carrierCode: { type: string }
-        currentStatus: { type: string }
-        lastLocation: { $ref: '#/components/schemas/TrackingLocation' }
-        lastEventOccurredAt: { type: string, format: date-time }
-        estimatedDeliveryDate: { type: string, format: date, nullable: true }
-        deliveredAt: { type: string, format: date-time, nullable: true }
-        currentExceptionCode: { type: string, nullable: true }
-
-    TrackingEventResponse:
-      type: object
-      properties:
-        eventId: { type: string, format: uuid }
-        status: { type: string }
-        description: { type: string }
-        exceptionCode: { type: string, nullable: true }
-        location: { $ref: '#/components/schemas/TrackingLocation' }
-        occurredAt: { type: string, format: date-time }
-        receivedAt: { type: string, format: date-time }
-
-    TrackingStatusChangedEvent:
-      type: object
-      required: [messageId, shipmentId, buyerId, trackingCode, currentStatus, occurredAt]
-      properties:
-        messageId: { type: string, format: uuid }
-        shipmentId: { type: string, format: uuid }
-        buyerId: { type: string, format: uuid }
-        trackingCode: { type: string }
-        currentStatus: { type: string }
-        occurredAt: { type: string, format: date-time }
-        estimatedDeliveryDate: { type: string, format: date, nullable: true }
-        exceptionCode: { type: string, nullable: true }
-
-    NotificationResponse:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        recipientId: { type: string, format: uuid }
-        type: { type: string }
-        status: { type: string, enum: [Pending, Processing, Delivered, Failed, Cancelled] }
-        priority: { type: integer }
-        createdAt: { type: string, format: date-time }
-        deliveries:
-          type: array
-          items:
-            type: object
-            properties:
-              id: { type: string, format: uuid }
-              channel: { type: string, enum: [Email, Sms, Push] }
-              status: { type: string }
-              templateVersion: { type: integer }
-              attempts: { type: integer }
-              acceptedAt: { type: string, format: date-time, nullable: true }
-              deliveredAt: { type: string, format: date-time, nullable: true }
-              destination: { type: string }
-
-    ProviderReceiptRequest:
-      type: object
-      required: [providerEventId, providerMessageId, status, occurredAt]
-      properties:
-        providerEventId: { type: string }
-        providerMessageId: { type: string }
-        status: { type: string, enum: [Delivered, Bounced, Failed] }
-        occurredAt: { type: string, format: date-time }
-        signature: { type: string }
-
-    AuditEventResponse:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        entityType: { type: string, description: Tipo da entidade auditada (ex. Order, Checkout, Shipment) }
-        entityId: { type: string, format: uuid }
-        eventType: { type: string, description: Tipo do evento (ex. OrderCreated, CheckoutConfirmed) }
-        actorId: { type: string, nullable: true }
-        actorType: { type: string, enum: [User, Service, System], nullable: true }
-        payload:
-          type: object
-          additionalProperties: true
-          nullable: true
-        correlationId: { type: string, format: uuid, nullable: true }
-        traceId: { type: string, nullable: true }
-        occurredAt: { type: string, format: date-time }
-        persistedAt: { type: string, format: date-time }
-
-    ProductPageResponse:
-      type: object
-      properties:
-        product: { $ref: '#/components/schemas/ProductResponse' }
-        shipping: { $ref: '#/components/schemas/ShippingPromiseResponse' }
-        warnings:
-          type: array
-          items: { type: string }
-
-    OrderPageResponse:
-      type: object
-      properties:
-        order: { $ref: '#/components/schemas/OrderResponse' }
-        shipment: { $ref: '#/components/schemas/ShipmentResponse' }
-        tracking: { $ref: '#/components/schemas/TrackingResponse' }
-        warnings:
-          type: array
-          items: { type: string }
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ShipmentId:
+      name: shipmentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
