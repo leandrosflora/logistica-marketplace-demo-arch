@@ -457,6 +457,18 @@ paths:
       responses:
         '200': { description: Rate card aposentado }
 
+  /orders:
+    get:
+      tags: [OrderService]
+      summary: Lista pedidos
+      parameters:
+        - name: buyerId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Lista de pedidos (filtrada por buyerId quando informado) }
+
   /orders/{orderId}:
     get:
       tags: [OrderService]

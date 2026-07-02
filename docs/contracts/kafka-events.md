@@ -43,9 +43,10 @@ Foram considerados:
 |---|---|---|---|
 | `inventory.commands` | `OrderService` | `InventoryService` | Implementado |
 | `inventory.reserved` | `InventoryService` | `OrderService` | Implementado |
-| `inventory.reservation.confirmed` | `InventoryService` | Configurado em `KafkaOptions` do `OrderService`; consumer não registrado no `Program.cs` atual | Parcial |
+| `inventory.reservation.confirmed` | `InventoryService` | `OrderService` (`InventoryReservedConsumer` assina os dois tópicos, `inventory.reserved` e `inventory.reservation.confirmed`) | Implementado |
 | `inventory.reservation.failed` | `InventoryService` | `OrderService` | Implementado |
 | `inventory.reservation.released` | `InventoryService` | Não localizado | Produzido sem consumidor |
+| `inventory.reservation.expired` | `InventoryService` | Não localizado | Produzido sem consumidor (renomeado de `InventoryReservationExpired`, fora do padrão `x.y.z`, para `inventory.reservation.expired`) |
 
 ### Saga de fulfillment
 
@@ -53,8 +54,9 @@ Foram considerados:
 |---|---|---|---|
 | `fulfillment.commands` | `OrderService` | `FulfillmentCenterService` | Implementado |
 | `fulfillment.capacity.reserved` | `FulfillmentCenterService` | `OrderService` | Implementado |
-| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | Configurado em `KafkaOptions` do `OrderService`; consumer não registrado no `Program.cs` atual | Parcial |
+| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | `OrderService` (`FulfillmentCapacityReservedConsumer` assina os dois tópicos, `fulfillment.capacity.reserved` e `fulfillment.capacity.confirmed`) | Implementado |
 | `fulfillment.capacity.failed` | `FulfillmentCenterService` | `OrderService` | Implementado |
+| `fulfillment.capacity.reservation.expired` | `FulfillmentCenterService` | Não localizado | Produzido sem consumidor (renomeado de `FulfillmentCapacityReservationExpired`, fora do padrão `x.y.z`, para `fulfillment.capacity.reservation.expired`) |
 
 ### Pagamento
 
@@ -127,13 +129,15 @@ Regras:
 | `order.created` | `OrderService` | `ShipmentService`, `NotificationService` | Evento implementado |
 | `inventory.commands` | `OrderService` | `InventoryService` | Comando interno implementado |
 | `inventory.reserved` | `InventoryService` | `OrderService` | Evento interno implementado |
-| `inventory.reservation.confirmed` | `InventoryService` | Parcial no `OrderService` | Parcial |
+| `inventory.reservation.confirmed` | `InventoryService` | `OrderService` | Evento interno implementado |
 | `inventory.reservation.failed` | `InventoryService` | `OrderService` | Evento interno implementado |
 | `inventory.reservation.released` | `InventoryService` | Não localizado | Produzido sem consumidor |
+| `inventory.reservation.expired` | `InventoryService` | Não localizado | Produzido sem consumidor |
 | `fulfillment.commands` | `OrderService` | `FulfillmentCenterService` | Comando interno implementado |
 | `fulfillment.capacity.reserved` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
-| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | Parcial no `OrderService` | Parcial |
+| `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
 | `fulfillment.capacity.failed` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
+| `fulfillment.capacity.reservation.expired` | `FulfillmentCenterService` | Não localizado | Produzido sem consumidor |
 | `payment.commands` | `OrderService` | Não implementado | Pendente |
 | `shipment.commands` | `OrderService` | `ShipmentService` | Comando interno implementado |
 | `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService` | Evento implementado |
