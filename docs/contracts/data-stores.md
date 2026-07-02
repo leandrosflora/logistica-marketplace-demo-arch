@@ -30,17 +30,12 @@ Este arquivo foi atualizado em **2026-06-25** após varredura dos bootstraps (`P
 | Routing Service | `RoutingDb`; pode usar mock repository | Grafo logístico, lanes e rotas calculadas | Redis com prefixo `routing:` ou distributed memory cache em modo mock | Não usa Kafka no bootstrap atual |
 | Carrier Service | `CarrierDb` | Carriers, service levels, lanes, status e disponibilidade | Redis com prefixo `carrier:` | Possui outbox writer administrativo; não há dispatcher Kafka registrado no `Program.cs` atual |
 | Shipping Pricing Service | `PricingDb` | Rate cards, políticas, preços e quotes | Redis com prefixo `shipping-pricing:` | Possui outbox writer; não há dispatcher Kafka registrado no `Program.cs` atual |
-| Order Service | `OrderDb`; schema default `order_domain` no fallback | Orders, itens, inbox, outbox, estado da saga e idempotência | Não registrado no bootstrap atual | Consome `checkout.confirmed`, eventos de inventory/fulfillment/shipment/status; publica `order.created`, `inventory.commands`, `fulfillment.commands`, `payment.commands`, `shipment.commands`, `order.events` |
+| Payment Service | Schema Postgres `payment` (search_path) | `PaymentAuthorization`, inbox e outbox | Não registrado no bootstrap atual | Consome `payment.commands`; publica `payment.approved`, `payment.rejected`, `payment.captured`, `payment.capture.failed` |
+| Order Service | `OrderDb`; schema default `order_domain` no fallback | Orders, itens, inbox, outbox, estado da saga e idempotência | Não registrado no bootstrap atual | Consome `checkout.confirmed`, eventos de inventory/fulfillment/payment/shipment/status; publica `order.created`, `inventory.commands`, `fulfillment.commands`, `payment.commands`, `shipment.commands`, `order.events` |
 | Shipment Service | `ShipmentDb` | Shipment, packages, itens, etiqueta, inbox/outbox | FileSystem para labels; cache não registrado | Consome `order.created` e `shipment.commands`; publica `shipment.created`; escreve `carrier-shipment.commands` em cancelamento |
 | Tracking Service | `TrackingDb` | ShipmentTracking e TrackingEvent | Não registrado no bootstrap atual | Consome `shipment.created`; publica `shipment.status.updated` |
 | Notification Service | `NotificationDb` | Notifications, deliveries, preferences, outbox/inbox | Não registrado no bootstrap atual | Consome eventos configurados em `KafkaOptions`; publica via canais externos Email/SMS/Push, não eventos canônicos |
-
-## Componentes ausentes
-
-| Componente | Situação |
-|---|---|
-| Payment Service | Não há repositório implementado. A saga do `OrderService` emite `payment.commands`, mas o consumidor não faz parte do conjunto atual. |
-| Audit Service | Não há repositório implementado. Não deve aparecer como dono de schema/código atual. |
+| Audit Service | Schema Postgres `audit` (search_path); acesso via Dapper/Npgsql, não EF Core | `AuditEntry` (imutável), inbox | Não registrado no bootstrap atual | Consome os dez tópicos canônicos com producer real; não publica eventos |
 
 ## Infraestrutura local
 
@@ -67,5 +62,5 @@ O `docker-compose.yml` deste repo fornece infraestrutura compartilhada para dese
 ## Observações
 
 - `ProductSearchService` não deve ser documentado como OpenSearch em produção atual: o código registra `PostgresProductSearchRepository`.
-- `PaymentService` e `AuditService` não devem aparecer como microservices implementados.
+- `AuditService` usa Dapper/Npgsql em vez de EF Core — escolha arquitetural explícita, não inconsistência a corrigir.
 - Tópicos sem producer implementado devem ser marcados como configurados/pendentes, não como fluxo E2E pronto.

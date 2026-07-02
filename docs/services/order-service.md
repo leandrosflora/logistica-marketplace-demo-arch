@@ -15,12 +15,6 @@ No estado atual, o serviço:
 - atualiza pedido com eventos de shipment/tracking;
 - expõe consulta e cancelamento de pedido por HTTP.
 
-## Lacuna importante
-
-`PaymentService` não existe como microservice implementado. Portanto, a etapa de pagamento da saga é uma dependência pendente/simulável.
-
-Além disso, o `OrderService` possui handlers internos para eventos de pagamento no `OrderProcessManager`, mas o `Program.cs` atual **não registra hosted consumers de pagamento** e o `KafkaOptions` atual **não declara tópicos `payment.approved`/`payment.rejected`**.
-
 ## Dados dominados
 
 - **Order**: pedido com checkout, buyer, seller, itens, status, valores, reservas, pagamento e shipment associados.
@@ -45,7 +39,7 @@ Não há endpoint `POST /v1/orders` implementado no código atual. A criação d
 | `order.created` | Ao consumir `checkout.confirmed` e criar o pedido | Implementado |
 | `inventory.commands` | Para reservar, confirmar ou liberar reserva de estoque | Implementado |
 | `fulfillment.commands` | Para reservar, confirmar ou liberar capacidade de fulfillment | Implementado |
-| `payment.commands` | Para autorizar, capturar ou cancelar autorização de pagamento | Produzido, mas sem consumer implementado |
+| `payment.commands` | Para autorizar, capturar ou cancelar autorização de pagamento | Implementado; consumido por `PaymentService` |
 | `shipment.commands` | Para solicitar criação de shipment | Implementado |
 | `order.events` | Para eventos internos de confirmação/cancelamento | Interno; não equivale hoje a `order.confirmed`/`order.cancelled` canônicos |
 
@@ -60,6 +54,10 @@ Não há endpoint `POST /v1/orders` implementado no código atual. A criação d
 | `fulfillment.capacity.failed` | `FulfillmentCapacityFailedConsumer` | Cancelar/compensar saga |
 | `shipment.created` | `ShipmentCreatedConsumer` | Associar shipment ao pedido e disparar captura de pagamento |
 | `shipment.status.updated` | `ShipmentStatusUpdatedConsumer` | Atualizar status de entrega no pedido |
+| `payment.approved` | `PaymentResponseConsumer` | Marcar pagamento autorizado e avaliar avanço da saga |
+| `payment.rejected` | `PaymentResponseConsumer` | Cancelar/compensar saga por recusa de autorização |
+| `payment.captured` | `PaymentResponseConsumer` | Marcar pagamento capturado |
+| `payment.capture.failed` | `PaymentResponseConsumer` | Registrar falha de captura |
 
 ## Tópicos declarados em configuração, mas sem hosted consumer localizado
 
@@ -100,7 +98,7 @@ A matriz consolidada de dados fica em [data-stores.md](../contracts/data-stores.
 2. Processamento de mensagens usa inbox para evitar duplicidade.
 3. Publicação usa outbox para garantir entrega eventual.
 4. Estoque e capacidade são reservados antes da etapa de pagamento.
-5. Pagamento está pendente de implementação de consumer real de `payment.commands`.
+5. Pagamento é autorizado/capturado por `PaymentService`, consumido via `payment.approved`/`payment.rejected`/`payment.captured`/`payment.capture.failed`.
 6. `order.events` é tópico interno/controlado, não deve ser vendido como tópico canônico público sem ajuste no código.
 
 ## Decisões arquiteturais relacionadas

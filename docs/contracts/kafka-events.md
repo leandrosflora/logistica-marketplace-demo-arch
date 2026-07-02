@@ -26,15 +26,15 @@ Foram considerados:
 
 | Tópico | Producer | Consumer | Status prático |
 |---|---|---|---|
-| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService` | Implementado |
-| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService` | Implementado |
+| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService`, `AuditService` | Implementado |
+| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService`, `AuditService` | Implementado |
 
 ### Checkout e pedido
 
 | Tópico | Producer | Consumer | Status prático |
 |---|---|---|---|
-| `checkout.confirmed` | `CheckoutService` | `OrderService` | Implementado |
-| `order.created` | `OrderService` | `ShipmentService`, `NotificationService` | Implementado |
+| `checkout.confirmed` | `CheckoutService` | `OrderService`, `AuditService` | Implementado |
+| `order.created` | `OrderService` | `ShipmentService`, `NotificationService`, `AuditService` | Implementado |
 | `order.events` | `OrderService` | Consumidores internos/controlados | Interno; usado para eventos de confirmação/cancelamento no código atual |
 
 ### Saga de estoque
@@ -62,9 +62,13 @@ Foram considerados:
 
 | Tópico | Producer | Consumer | Status prático |
 |---|---|---|---|
-| `payment.commands` | `OrderService` | Nenhum consumer implementado no conjunto atual | Produzido sem consumidor; depende de `PaymentService` ou adapter externo ainda ausente |
+| `payment.commands` | `OrderService` | `PaymentService` | Implementado |
+| `payment.approved` | `PaymentService` | `OrderService`, `AuditService` | Implementado |
+| `payment.rejected` | `PaymentService` | `NotificationService`, `OrderService`, `AuditService` | Implementado |
+| `payment.captured` | `PaymentService` | `OrderService`, `AuditService` | Implementado |
+| `payment.capture.failed` | `PaymentService` | `OrderService`, `AuditService` | Implementado |
 
-> `PaymentService` não existe como repositório/microservice implementado. Portanto, `payment.commands` deve ser tratado como ponto pendente/simulável da saga, não como integração E2E completa.
+`PaymentService` não integra com um gateway/PSP real; usa um adaptador mock determinístico (ver [docs/services/payment-service.md](../services/payment-service.md)).
 
 ### Shipment e tracking
 
@@ -72,8 +76,8 @@ Foram considerados:
 |---|---|---|---|
 | `shipment.commands` | `OrderService` | `ShipmentService` | Implementado |
 | `order.created` | `OrderService` | `ShipmentService` | Implementado |
-| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService` | Implementado |
-| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService` | Implementado |
+| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService`, `AuditService` | Implementado |
+| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService`, `AuditService` | Implementado |
 | `carrier-shipment.commands` | `ShipmentService` | Nenhum consumer localizado | Produzido sem consumidor; integração com carrier pendente/simulada |
 
 ## Tópicos configurados em consumer, mas sem producer implementado
@@ -84,16 +88,8 @@ Os tópicos abaixo aparecem em configurações de consumer, principalmente no `N
 |---|---|---|
 | `order.confirmed` | `NotificationService` | Producer canônico não localizado. O `OrderService` escreve confirmação em `order.events`, não em `order.confirmed`. |
 | `order.cancelled` | `NotificationService` | Producer canônico não localizado. O `OrderService` escreve cancelamento em `order.events`. |
-| `payment.rejected` | `NotificationService` | Producer ausente porque não há `PaymentService`. |
 | `shipment.cancelled` | `NotificationService` | Producer ausente no `ShipmentService` atual. Cancelamento escreve `carrier-shipment.commands`. |
 | `shipment.creation.failed` | `OrderService` | Configurado no `KafkaOptions`, mas consumer registrado no `Program.cs` não foi localizado. |
-
-## Componentes removidos da visão implementada
-
-| Componente | Motivo |
-|---|---|
-| `AuditService` | Não existe repo/microservice implementado. Não deve aparecer como consumer real. |
-| `PaymentService` | Não existe repo/microservice implementado. A saga ainda escreve `payment.commands`, mas sem consumidor real. |
 
 ## Contrato de envelope recomendado
 
@@ -123,10 +119,10 @@ Regras:
 
 | Tópico | Producer | Consumer principal | Classificação |
 |---|---|---|---|
-| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService` | Evento implementado |
-| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService` | Evento implementado |
-| `checkout.confirmed` | `CheckoutService` | `OrderService` | Evento implementado |
-| `order.created` | `OrderService` | `ShipmentService`, `NotificationService` | Evento implementado |
+| `checkout.shipping.quote.requested` | `CheckoutService` | `ShippingPromiseService`, `AuditService` | Evento implementado |
+| `shipping.promise.calculated` | `ShippingPromiseService` | `CheckoutService`, `AuditService` | Evento implementado |
+| `checkout.confirmed` | `CheckoutService` | `OrderService`, `AuditService` | Evento implementado |
+| `order.created` | `OrderService` | `ShipmentService`, `NotificationService`, `AuditService` | Evento implementado |
 | `inventory.commands` | `OrderService` | `InventoryService` | Comando interno implementado |
 | `inventory.reserved` | `InventoryService` | `OrderService` | Evento interno implementado |
 | `inventory.reservation.confirmed` | `InventoryService` | `OrderService` | Evento interno implementado |
@@ -138,10 +134,14 @@ Regras:
 | `fulfillment.capacity.confirmed` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
 | `fulfillment.capacity.failed` | `FulfillmentCenterService` | `OrderService` | Evento interno implementado |
 | `fulfillment.capacity.reservation.expired` | `FulfillmentCenterService` | Não localizado | Produzido sem consumidor |
-| `payment.commands` | `OrderService` | Não implementado | Pendente |
+| `payment.commands` | `OrderService` | `PaymentService` | Comando interno implementado |
+| `payment.approved` | `PaymentService` | `OrderService`, `AuditService` | Evento implementado |
+| `payment.rejected` | `PaymentService` | `NotificationService`, `OrderService`, `AuditService` | Evento implementado |
+| `payment.captured` | `PaymentService` | `OrderService`, `AuditService` | Evento implementado |
+| `payment.capture.failed` | `PaymentService` | `OrderService`, `AuditService` | Evento implementado |
 | `shipment.commands` | `OrderService` | `ShipmentService` | Comando interno implementado |
-| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService` | Evento implementado |
-| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService` | Evento implementado |
+| `shipment.created` | `ShipmentService` | `TrackingService`, `NotificationService`, `OrderService`, `AuditService` | Evento implementado |
+| `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService`, `AuditService` | Evento implementado |
 | `carrier-shipment.commands` | `ShipmentService` | Não localizado | Pendente |
 | `order.events` | `OrderService` | Interno/controlado | Interno |
 
@@ -149,7 +149,6 @@ Regras:
 
 A documentação deve tratar o E2E atual como **parcial**:
 
-- completo para checkout → promise → order → inventory/fulfillment → shipment → tracking/notification;
-- incompleto na etapa de pagamento, porque o consumidor de `payment.commands` não existe;
-- incompleto para auditoria, porque `AuditService` não existe;
+- completo para checkout → promise → order → inventory/fulfillment → payment → shipment → tracking/notification;
+- auditoria coberta pelo `AuditService` para os dez tópicos canônicos com producer real (ver [audit-service.md](../services/audit-service.md));
 - incompleto para alguns eventos de notificação configurados sem producer canônico.
