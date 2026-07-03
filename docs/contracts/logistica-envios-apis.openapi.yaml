@@ -133,6 +133,34 @@ paths:
         - { name: skuIds, in: query, required: true, schema: { type: array, items: { type: string, format: uuid } }, style: form, explode: true }
       responses:
         '200': { description: Atributos logísticos retornados }
+  /v1/products/:
+    post:
+      tags: [ProductCatalogService]
+      summary: >-
+        Cria um produto (dados comerciais + logísticos). Adicionado para
+        openspec/changes/admin-backoffice; consumido pelo MarketplaceAdmin.Bff
+        (POST /admin/products).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Produto criado }
+        '400': { description: Payload inválido (peso/dimensões <= 0, título/categoria ausentes) }
+        '409': { description: SKU já existe }
+  /v1/products/{skuId}:
+    get:
+      tags: [ProductCatalogService]
+      summary: >-
+        Consulta um produto por SKU (dados comerciais + logísticos). Adicionado
+        para openspec/changes/admin-backoffice; consumido pelo
+        MarketplaceAdmin.Bff (GET /admin/products/{skuId}).
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      responses:
+        '200': { description: Produto encontrado }
+        '404': { description: Produto não encontrado }
   /v1/products/{skuId}/logistics:
     get:
       tags: [ProductCatalogService]
@@ -142,6 +170,41 @@ paths:
       responses:
         '200': { description: SKU encontrado }
         '404': { description: SKU não encontrado }
+    put:
+      tags: [ProductCatalogService]
+      summary: >-
+        Atualiza os atributos logísticos de um SKU (peso, dimensões,
+        frágil/restrito). Adicionado para openspec/changes/admin-backoffice;
+        consumido pelo MarketplaceAdmin.Bff (PUT /admin/products/{skuId}/logistics).
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Atributos logísticos atualizados }
+        '400': { description: Peso/dimensões <= 0 }
+        '404': { description: Produto não encontrado }
+  /v1/products/{skuId}/status:
+    patch:
+      tags: [ProductCatalogService]
+      summary: >-
+        Altera o status de um produto (Draft/Active/Paused/Blocked/Deleted).
+        Adicionado para openspec/changes/admin-backoffice; consumido pelo
+        MarketplaceAdmin.Bff (PATCH /admin/products/{skuId}/status).
+      parameters:
+        - $ref: '#/components/parameters/SkuId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Status alterado }
+        '400': { description: Status inválido }
+        '404': { description: Produto não encontrado }
 
   /v1/inventory/availability/batch:
     post:
@@ -193,10 +256,28 @@ paths:
         - $ref: '#/components/parameters/ReservationId'
       responses:
         '200': { description: Reserva liberada }
+  /v1/inventory/:
+    get:
+      tags: [InventoryService]
+      summary: >-
+        Lista itens de estoque filtrando por sellerId/skuId/fulfillmentCenterId
+        (todos opcionais). Adicionado para openspec/changes/admin-backoffice;
+        consumido pelo MarketplaceAdmin.Bff (GET /admin/inventory).
+      parameters:
+        - { name: sellerId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: skuId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: fulfillmentCenterId, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Itens de estoque retornados }
   /v1/inventory/adjustments:
     post:
       tags: [InventoryService]
-      summary: Ajusta estoque
+      summary: >-
+        Ajusta estoque. Idempotente por Idempotency-Key desde
+        openspec/changes/admin-backoffice (chave persistida em
+        inventory.stock_movements; replays com a mesma chave não reaplicam o delta).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -204,6 +285,7 @@ paths:
             schema: { type: object }
       responses:
         '202': { description: Ajuste aceito }
+        '400': { description: Idempotency-Key ausente ou payload inválido (quantityDelta=0, ids ausentes) }
 
   /fulfillment-centers/candidates/search:
     post:
@@ -216,7 +298,48 @@ paths:
             schema: { type: object }
       responses:
         '200': { description: Centros candidatos }
+  /fulfillment-centers/:
+    post:
+      tags: [FulfillmentCenterService]
+      summary: >-
+        Cria um fulfillment center. Adicionado para openspec/changes/admin-backoffice;
+        consumido pelo MarketplaceAdmin.Bff (POST /admin/fulfillment-centers).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Fulfillment center criado }
+        '400': { description: Payload inválido (pesos máximos <= 0, code/timeZoneId ausentes) }
+        '409': { description: Já existe um fulfillment center com este código }
+    get:
+      tags: [FulfillmentCenterService]
+      summary: >-
+        Lista fulfillment centers. Adicionado para openspec/changes/admin-backoffice.
+      responses:
+        '200': { description: Fulfillment centers retornados }
+  /fulfillment-centers/{fulfillmentCenterId}:
+    get:
+      tags: [FulfillmentCenterService]
+      summary: >-
+        Consulta um fulfillment center por id. Adicionado para
+        openspec/changes/admin-backoffice.
+      parameters:
+        - $ref: '#/components/parameters/FulfillmentCenterId'
+      responses:
+        '200': { description: Fulfillment center encontrado }
+        '404': { description: Fulfillment center não encontrado }
   /fulfillment-centers/{fulfillmentCenterId}/capacity:
+    get:
+      tags: [FulfillmentCenterService]
+      summary: >-
+        Lista os slots de capacidade configurados para um fulfillment center.
+        Adicionado para openspec/changes/admin-backoffice.
+      parameters:
+        - $ref: '#/components/parameters/FulfillmentCenterId'
+      responses:
+        '200': { description: Slots de capacidade retornados }
     put:
       tags: [FulfillmentCenterService]
       summary: Configura capacidade de fulfillment center
@@ -229,6 +352,8 @@ paths:
             schema: { type: object }
       responses:
         '204': { description: Capacidade configurada }
+        '400': { description: Payload inválido }
+        '404': { description: Fulfillment center não encontrado }
   /fulfillment-centers/{fulfillmentCenterId}/status:
     patch:
       tags: [FulfillmentCenterService]
@@ -298,6 +423,84 @@ paths:
         '200': { description: Rota encontrada }
         '404': { description: Rota não encontrada }
 
+  /v1/routing/nodes:
+    post:
+      tags: [RoutingService]
+      summary: >-
+        Cria um nó logístico. Adicionado para openspec/changes/admin-backoffice;
+        consumido pelo MarketplaceAdmin.Bff (POST /admin/network/nodes).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Nó criado }
+        '400': { description: Payload inválido (code/name/region/timeZoneId ausentes, handlingMinutes < 0) }
+    get:
+      tags: [RoutingService]
+      summary: >-
+        Lista nós logísticos, opcionalmente filtrando por region. Adicionado
+        para openspec/changes/admin-backoffice.
+      parameters:
+        - { name: region, in: query, required: false, schema: { type: string } }
+      responses:
+        '200': { description: Nós retornados }
+  /v1/routing/lanes:
+    post:
+      tags: [RoutingService]
+      summary: >-
+        Cria uma lane entre dois nós existentes. Adicionado para
+        openspec/changes/admin-backoffice; consumido pelo MarketplaceAdmin.Bff
+        (POST /admin/network/lanes).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Lane criada }
+        '400': { description: Payload inválido (origem/destino iguais, transitMinutes/pesos <= 0) }
+        '404': { description: Nó de origem ou destino não encontrado }
+    get:
+      tags: [RoutingService]
+      summary: Lista lanes. Adicionado para openspec/changes/admin-backoffice.
+      responses:
+        '200': { description: Lanes retornadas }
+  /v1/routing/lanes/{laneId}:
+    put:
+      tags: [RoutingService]
+      summary: >-
+        Atualiza trânsito, pesos máximos e cronograma semanal de uma lane.
+        Adicionado para openspec/changes/admin-backoffice.
+      parameters:
+        - { name: laneId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Lane atualizada }
+        '400': { description: Payload inválido }
+        '404': { description: Lane não encontrada }
+  /v1/routing/lanes/{laneId}/status:
+    patch:
+      tags: [RoutingService]
+      summary: >-
+        Altera o status de uma lane (Active/Suspended/Maintenance/Inactive).
+        Adicionado para openspec/changes/admin-backoffice.
+      parameters:
+        - { name: laneId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Status alterado }
+        '404': { description: Lane não encontrada }
+
   /v1/carrier-availability/search:
     post:
       tags: [CarrierService]
@@ -320,6 +523,15 @@ paths:
             schema: { type: object }
       responses:
         '201': { description: Carrier criado }
+        '400': { description: Payload inválido (code/name ausentes) }
+        '409': { description: Já existe um carrier com este código }
+    get:
+      tags: [CarrierService]
+      summary: >-
+        Lista carriers. Adicionado para openspec/changes/admin-backoffice;
+        consumido pelo MarketplaceAdmin.Bff (GET /admin/carriers).
+      responses:
+        '200': { description: Carriers retornados }
   /v1/carriers/{carrierCode}:
     get:
       tags: [CarrierService]
@@ -368,6 +580,17 @@ paths:
             schema: { type: object }
       responses:
         '201': { description: Service level criado }
+        '400': { description: Payload inválido (maximumWeightKg <= 0) }
+        '404': { description: Carrier não encontrado }
+    get:
+      tags: [CarrierService]
+      summary: >-
+        Lista service levels de um carrier. Adicionado para
+        openspec/changes/admin-backoffice.
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      responses:
+        '200': { description: Service levels retornados }
         '404': { description: Carrier não encontrado }
   /v1/carriers/{carrierCode}/lanes:
     post:
@@ -382,7 +605,18 @@ paths:
             schema: { type: object }
       responses:
         '201': { description: Lane criada }
+        '400': { description: Payload inválido }
         '404': { description: Carrier ou service level não encontrado }
+    get:
+      tags: [CarrierService]
+      summary: >-
+        Lista lanes de um carrier (todas as service levels). Adicionado para
+        openspec/changes/admin-backoffice.
+      parameters:
+        - $ref: '#/components/parameters/CarrierCode'
+      responses:
+        '200': { description: Lanes retornadas }
+        '404': { description: Carrier não encontrado }
 
   /v1/pricing/freight:
     post:
@@ -427,7 +661,23 @@ paths:
             schema: { type: object }
       responses:
         '201': { description: Rate card criado }
+        '400': { description: Payload inválido (sem bands, datas inválidas) }
+    get:
+      tags: [ShippingPricingService]
+      summary: Lista rate cards. Adicionado para openspec/changes/admin-backoffice.
+      responses:
+        '200': { description: Rate cards retornados }
   /rate-cards/{rateCardId}:
+    get:
+      tags: [ShippingPricingService]
+      summary: >-
+        Consulta um rate card por id. Adicionado para
+        openspec/changes/admin-backoffice.
+      parameters:
+        - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Rate card encontrado }
+        '404': { description: Rate card não encontrado }
     put:
       tags: [ShippingPricingService]
       summary: Atualiza rate card
@@ -440,6 +690,9 @@ paths:
             schema: { type: object }
       responses:
         '200': { description: Rate card atualizado }
+        '400': { description: Payload inválido }
+        '404': { description: Rate card não encontrado }
+        '409': { description: Rate card não está em Draft }
   /rate-cards/{rateCardId}/activate:
     post:
       tags: [ShippingPricingService]
@@ -448,6 +701,8 @@ paths:
         - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: Rate card ativado }
+        '404': { description: Rate card não encontrado }
+        '409': { description: Rate card não está em Draft }
   /rate-cards/{rateCardId}/retire:
     post:
       tags: [ShippingPricingService]
@@ -456,23 +711,76 @@ paths:
         - { name: rateCardId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: Rate card aposentado }
+        '404': { description: Rate card não encontrado }
+  /promotion-rules:
+    get:
+      tags: [ShippingPricingService]
+      summary: >-
+        Lista regras de subsídio/promoção. Adicionado para
+        openspec/changes/admin-backoffice; consumido pelo MarketplaceAdmin.Bff
+        (GET /admin/subsidy-rules).
+      responses:
+        '200': { description: Regras retornadas }
+    post:
+      tags: [ShippingPricingService]
+      summary: >-
+        Cria uma regra de subsídio/promoção. Adicionado para
+        openspec/changes/admin-backoffice. Domínio interno: `PromotionRuleEntity`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '201': { description: Regra criada }
+        '400': { description: Payload inválido (percentuais fora de 0-100 ou soma > 100) }
+  /promotion-rules/{promotionId}/active:
+    patch:
+      tags: [ShippingPricingService]
+      summary: >-
+        Ativa ou desativa uma regra de subsídio/promoção. Adicionado para
+        openspec/changes/admin-backoffice.
+      parameters:
+        - { name: promotionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Regra atualizada }
+        '404': { description: Regra não encontrada }
 
   /orders:
     get:
       tags: [OrderService]
-      summary: Lista pedidos
+      summary: >-
+        Lista pedidos. Filtros sellerId/status adicionados para
+        openspec/changes/admin-backoffice; consumido pelo MarketplaceAdmin.Bff
+        (GET /admin/orders).
       parameters:
         - name: buyerId
           in: query
           required: false
           schema: { type: string, format: uuid }
+        - name: sellerId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
       responses:
-        '200': { description: Lista de pedidos (filtrada por buyerId quando informado) }
+        '200': { description: Lista de pedidos (filtrada por buyerId/sellerId/status quando informados) }
+        '400': { description: Valor de status inválido }
 
   /orders/{orderId}:
     get:
       tags: [OrderService]
-      summary: Consulta pedido
+      summary: >-
+        Consulta pedido. Consumido pelo MarketplaceAdmin.Bff
+        (GET /admin/orders/{orderId}).
       parameters:
         - $ref: '#/components/parameters/OrderId'
       responses:
@@ -481,7 +789,11 @@ paths:
   /orders/{orderId}/cancel:
     post:
       tags: [OrderService]
-      summary: Cancela pedido
+      summary: >-
+        Cancela pedido. Adicionado tratamento de KeyNotFoundException/404 e
+        InvalidOperationException/409 (pedido Confirmed exige processo de
+        devolução/reembolso) para openspec/changes/admin-backoffice; consumido
+        pelo MarketplaceAdmin.Bff (POST /admin/orders/{orderId}/cancel).
       parameters:
         - $ref: '#/components/parameters/OrderId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -493,6 +805,23 @@ paths:
       responses:
         '202': { description: Cancelamento aceito }
         '400': { description: Idempotency-Key ausente }
+        '404': { description: Pedido não encontrado }
+        '409': { description: Pedido em estado terminal (ex. Confirmed) não pode ser cancelado por este fluxo }
+
+  /shipments:
+    get:
+      tags: [ShipmentService]
+      summary: >-
+        Lista shipments (filtro opcional por orderId). Adicionado para
+        openspec/changes/admin-backoffice; consumido pelo MarketplaceAdmin.Bff
+        (GET /admin/shipments).
+      parameters:
+        - name: orderId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Lista de shipments (filtrada por orderId quando informado) }
 
   /shipments/{shipmentId}:
     get:
@@ -546,7 +875,13 @@ paths:
   /v1/tracking/events:
     post:
       tags: [TrackingService]
-      summary: Recebe evento de tracking de carrier
+      summary: >-
+        Recebe evento de tracking de carrier. Não valida existência do
+        shipmentId em ShipmentService (fora do bounded context deste
+        serviço) — para uso administrativo, o MarketplaceAdmin.Bff valida
+        isso antes de encaminhar (POST /admin/tracking/events), gerando
+        providerEventId/messageId já que eventos manuais não têm payload
+        real de webhook de carrier.
       parameters:
         - $ref: '#/components/parameters/CorrelationId'
       requestBody:

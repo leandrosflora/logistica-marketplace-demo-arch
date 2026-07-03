@@ -25,6 +25,7 @@ CREATE SCHEMA IF NOT EXISTS tracking;
 CREATE SCHEMA IF NOT EXISTS notification;
 CREATE SCHEMA IF NOT EXISTS audit;
 CREATE SCHEMA IF NOT EXISTS order_visibility;
+CREATE SCHEMA IF NOT EXISTS admin_bff;
 
 CREATE TABLE IF NOT EXISTS checkout.checkouts (
     checkout_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -575,6 +576,25 @@ CREATE INDEX IF NOT EXISTS ix_order_journey_events_event_type
     ON order_visibility.order_journey_events (event_type);
 CREATE INDEX IF NOT EXISTS ix_order_journey_events_occurred_at
     ON order_visibility.order_journey_events (occurred_at);
+
+-- Owned by MarketplaceAdmin.Bff (openspec/changes/admin-backoffice). The BFF never writes to
+-- any other schema; this is the only table it owns.
+CREATE TABLE IF NOT EXISTS admin_bff.admin_audit_log (
+    id uuid PRIMARY KEY,
+    admin_user_id varchar(200) NOT NULL,
+    action varchar(200) NOT NULL,
+    entity_type varchar(200) NOT NULL,
+    entity_id varchar(200) NOT NULL,
+    before_json jsonb NULL,
+    after_json jsonb NULL,
+    correlation_id varchar(100) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_admin_audit_log_created_at
+    ON admin_bff.admin_audit_log (created_at);
+CREATE INDEX IF NOT EXISTS ix_admin_audit_log_entity
+    ON admin_bff.admin_audit_log (entity_type, entity_id);
 
 CREATE TABLE IF NOT EXISTS checkout.idempotency_keys (
     idempotency_key uuid PRIMARY KEY,
@@ -1447,6 +1467,25 @@ CREATE TABLE IF NOT EXISTS inventory.inventory_items (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_items_lookup ON inventory.inventory_items (seller_id, sku_id, fulfillment_center_id);
 
+-- InventoryService (admin stock adjustments, openspec/changes/admin-backoffice).
+-- Distinct from the canonical inventory.inventory_adjustments table above: that table isn't
+-- read/written by any current service code (same situation as product_search.product_index),
+-- so this follows the inventory_items precedent of adding a fresh compat table that matches
+-- the EF Core entity (StockMovement) exactly, rather than retrofitting the unused one.
+CREATE TABLE IF NOT EXISTS inventory.stock_movements (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id uuid NOT NULL,
+    sku_id uuid NOT NULL,
+    fulfillment_center_id uuid NOT NULL,
+    quantity_delta integer NOT NULL,
+    reason text NOT NULL,
+    description text,
+    idempotency_key varchar(200) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_stock_movements_idempotency_key ON inventory.stock_movements (idempotency_key);
+CREATE INDEX IF NOT EXISTS ix_inventory_stock_movements_lookup ON inventory.stock_movements (seller_id, sku_id, fulfillment_center_id);
+
 ALTER TABLE inventory.inventory_reservations ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
 ALTER TABLE inventory.inventory_reservations ADD COLUMN IF NOT EXISTS checkout_id uuid;
 ALTER TABLE inventory.inventory_reservations ADD COLUMN IF NOT EXISTS seller_id uuid;
@@ -1501,6 +1540,16 @@ ALTER TABLE fulfillment.fulfillment_centers ADD COLUMN IF NOT EXISTS "SupportsRe
 ALTER TABLE fulfillment.fulfillment_centers ADD COLUMN IF NOT EXISTS "CreatedAt" timestamptz DEFAULT now();
 ALTER TABLE fulfillment.fulfillment_centers ADD COLUMN IF NOT EXISTS "UpdatedAt" timestamptz DEFAULT now();
 CREATE UNIQUE INDEX IF NOT EXISTS ux_fulfillment_centers_ef_id ON fulfillment.fulfillment_centers ("Id");
+-- CapacityManagementService.CreateAsync (openspec/changes/admin-backoffice) inserts new rows
+-- through the EF-mapped ("Code", "Name", ...) columns only. The canonical lowercase columns
+-- below have no default and would otherwise reject the insert with a NOT NULL violation, the
+-- same problem shipping_promise_projections had above with buyer_id/seller_id/source/carrier_code.
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN code DROP NOT NULL;
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN name DROP NOT NULL;
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN zip_code DROP NOT NULL;
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN city DROP NOT NULL;
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN state DROP NOT NULL;
+ALTER TABLE fulfillment.fulfillment_centers ALTER COLUMN daily_cutoff DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS fulfillment.capacity_slots (
     "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1635,6 +1684,10 @@ CREATE TABLE IF NOT EXISTS routing.outbox_messages (
 );
 
 -- CarrierService
+-- CarrierAdministrationEndpoints.CreateCarrier only populates the EF-mapped ("Code", "Name",
+-- ...) columns (openspec/changes/admin-backoffice); canonical name has no default, same
+-- NOT NULL problem as fulfillment.fulfillment_centers/code/name above.
+ALTER TABLE carrier.carriers ALTER COLUMN name DROP NOT NULL;
 ALTER TABLE carrier.carriers ALTER COLUMN carrier_code SET DEFAULT gen_random_uuid()::text;
 ALTER TABLE carrier.carriers ADD COLUMN IF NOT EXISTS "Id" uuid DEFAULT gen_random_uuid();
 ALTER TABLE carrier.carriers ADD COLUMN IF NOT EXISTS "Code" text;
@@ -1916,12 +1969,25 @@ ALTER TABLE tracking.inbox_messages ALTER COLUMN event_id SET DEFAULT gen_random
 ALTER TABLE tracking.inbox_messages ADD COLUMN IF NOT EXISTS message_id uuid DEFAULT gen_random_uuid();
 ALTER TABLE tracking.inbox_messages ADD COLUMN IF NOT EXISTS message_type text;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_tracking_inbox_messages_message_id ON tracking.inbox_messages (message_id);
+-- TrackingService's EF InboxMessage entity only populates message_id/message_type/processed_at;
+-- these inherited-from-checkout.inbox_messages columns must not block admin-triggered event inserts.
+ALTER TABLE tracking.inbox_messages ALTER COLUMN event_type DROP NOT NULL;
+ALTER TABLE tracking.inbox_messages ALTER COLUMN topic DROP NOT NULL;
+ALTER TABLE tracking.inbox_messages ALTER COLUMN payload DROP NOT NULL;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS message_type text;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS aggregate_key text;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS processed_at timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_tracking_outbox_messages_id ON tracking.outbox_messages (id);
+-- Same dual-schema trap as inbox_messages above: TrackingService's outbox writer only populates
+-- id/message_type/aggregate_key/next_attempt_at/processed_at, not the inherited legacy columns.
+ALTER TABLE tracking.outbox_messages ALTER COLUMN event_id DROP NOT NULL;
+ALTER TABLE tracking.outbox_messages ALTER COLUMN topic DROP NOT NULL;
+ALTER TABLE tracking.outbox_messages ALTER COLUMN event_type DROP NOT NULL;
+ALTER TABLE tracking.outbox_messages ALTER COLUMN correlation_id DROP NOT NULL;
+ALTER TABLE tracking.outbox_messages ALTER COLUMN producer DROP NOT NULL;
+ALTER TABLE tracking.outbox_messages ALTER COLUMN payload DROP NOT NULL;
 
 -- NotificationService
 CREATE TABLE IF NOT EXISTS notification.notifications (
@@ -2384,6 +2450,18 @@ SET
     "Status" = 'Active',
     "RequiresRealTimeValidation" = false
 WHERE carrier_code = 'carrier_1';
+
+-- 'correios' predates the compat backfill above and was missed; ICarrierRepository.ListAsync
+-- (openspec/changes/admin-backoffice) reads every row unconditionally, so a NULL "Code"/"Name"
+-- here throws InvalidCastException on materialization, not just fail an equality lookup.
+UPDATE carrier.carriers
+SET
+    "Id" = gen_random_uuid(),
+    "Code" = 'CORREIOS',
+    "Name" = 'Correios',
+    "Status" = 'Active',
+    "RequiresRealTimeValidation" = false
+WHERE carrier_code = 'correios';
 
 INSERT INTO carrier.carrier_service_levels (
     "Id", "CarrierId", "Code", "Name", "Mode", "MaximumWeightKg",
