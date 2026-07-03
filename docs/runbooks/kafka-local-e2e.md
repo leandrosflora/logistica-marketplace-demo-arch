@@ -105,6 +105,10 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.failed --partitions 1 --replication-factor 1
 
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.released --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic fulfillment.capacity.reservation.expired --partitions 1 --replication-factor 1
+
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic payment.commands --partitions 1 --replication-factor 1
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.commands --partitions 1 --replication-factor 1

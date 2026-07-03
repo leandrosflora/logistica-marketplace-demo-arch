@@ -1841,6 +1841,7 @@ ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS id uuid DEFAULT ge
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS message_type text;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS aggregate_key text;
 ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
+ALTER TABLE tracking.outbox_messages ADD COLUMN IF NOT EXISTS processed_at timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_tracking_outbox_messages_id ON tracking.outbox_messages (id);
 
 -- NotificationService
