@@ -24,6 +24,7 @@ CREATE SCHEMA IF NOT EXISTS shipment;
 CREATE SCHEMA IF NOT EXISTS tracking;
 CREATE SCHEMA IF NOT EXISTS notification;
 CREATE SCHEMA IF NOT EXISTS audit;
+CREATE SCHEMA IF NOT EXISTS order_visibility;
 
 CREATE TABLE IF NOT EXISTS checkout.checkouts (
     checkout_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -496,6 +497,84 @@ CREATE TABLE IF NOT EXISTS audit.audit_entries (
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS order_visibility.order_journey (
+    id uuid PRIMARY KEY,
+    order_id uuid NULL,
+    checkout_id uuid NULL,
+    buyer_id uuid NULL,
+    seller_id uuid NULL,
+
+    current_status varchar(80) NOT NULL,
+    current_step varchar(120) NOT NULL,
+
+    last_event_id uuid NULL,
+    last_event_type varchar(120) NULL,
+    last_event_at timestamptz NULL,
+
+    -- Not a uuid: producers fall back to HttpContext.TraceIdentifier (e.g.
+    -- "0HNMNNLB70E9S:00000043") as correlationId when no X-Correlation-Id header was sent.
+    correlation_id varchar(200) NOT NULL,
+    root_trace_id varchar(64) NULL,
+
+    has_error boolean NOT NULL DEFAULT false,
+    error_reason text NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_order_journey_order_id
+    ON order_visibility.order_journey (order_id) WHERE order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_order_journey_checkout_id
+    ON order_visibility.order_journey (checkout_id) WHERE checkout_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_order_journey_correlation_id
+    ON order_visibility.order_journey (correlation_id);
+CREATE INDEX IF NOT EXISTS ix_order_journey_current_status
+    ON order_visibility.order_journey (current_status);
+CREATE INDEX IF NOT EXISTS ix_order_journey_updated_at
+    ON order_visibility.order_journey (updated_at);
+
+CREATE TABLE IF NOT EXISTS order_visibility.order_journey_events (
+    id uuid PRIMARY KEY,
+    journey_id uuid NOT NULL REFERENCES order_visibility.order_journey (id),
+
+    order_id uuid NULL,
+    checkout_id uuid NULL,
+
+    event_id uuid NOT NULL,
+    event_type varchar(120) NOT NULL,
+    topic varchar(160) NOT NULL,
+    partition integer NULL,
+    offset_value bigint NULL,
+
+    service_name varchar(120) NULL,
+
+    status_before varchar(80) NULL,
+    status_after varchar(80) NULL,
+
+    correlation_id varchar(200) NOT NULL,
+    trace_id varchar(64) NULL,
+    span_id varchar(32) NULL,
+
+    occurred_at timestamptz NOT NULL,
+    consumed_at timestamptz NOT NULL DEFAULT now(),
+
+    payload_json jsonb NOT NULL,
+
+    UNIQUE (event_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_order_journey_events_order_id
+    ON order_visibility.order_journey_events (order_id);
+CREATE INDEX IF NOT EXISTS ix_order_journey_events_checkout_id
+    ON order_visibility.order_journey_events (checkout_id);
+CREATE INDEX IF NOT EXISTS ix_order_journey_events_correlation_id
+    ON order_visibility.order_journey_events (correlation_id);
+CREATE INDEX IF NOT EXISTS ix_order_journey_events_event_type
+    ON order_visibility.order_journey_events (event_type);
+CREATE INDEX IF NOT EXISTS ix_order_journey_events_occurred_at
+    ON order_visibility.order_journey_events (occurred_at);
 
 CREATE TABLE IF NOT EXISTS checkout.idempotency_keys (
     idempotency_key uuid PRIMARY KEY,

@@ -102,6 +102,8 @@ Para eventos canônicos e mensagens de integração, manter envelope com:
   "schemaVersion": "1.0",
   "occurredAt": "2026-06-14T12:00:00Z",
   "correlationId": "uuid",
+  "traceId": "hex-string",
+  "spanId": "hex-string",
   "producer": "shipment-service",
   "payload": {}
 }
@@ -114,6 +116,24 @@ Regras:
 3. `eventType` deve bater com o tópico quando o tópico for canônico.
 4. Mensagens de comando (`*.commands`) podem ter contrato próprio, mas precisam de `messageId`, chave de agregação e idempotência.
 5. Tópicos sem producer ou sem consumer implementado devem continuar marcados como pendentes/parciais.
+
+### `traceId` / `spanId` (opcionais, rollout incremental)
+
+Adicionados para permitir que o `OrderVisibilityService` (ver [order-visibility-service.md](../services/order-visibility-service.md)) linke um evento da timeline diretamente a um trace no Jaeger. São **opcionais e aditivos**: populados a partir do `Activity.Current` (OpenTelemetry) no momento em que o evento é gravado no outbox, e ausentes quando não há uma activity ativa. Nenhum consumidor deve exigir esses campos; quando ausentes, a correlação por `correlationId` continua sendo o caminho padrão.
+
+Status de adoção por producer (2026-07-02):
+
+| Producer | `traceId`/`spanId` no envelope |
+|---|---|
+| `CheckoutService` | Implementado (`checkout.shipping.quote.requested`, `checkout.confirmed`) |
+| `FulfillmentCenterService` | Implementado (`fulfillment.capacity.reserved/confirmed/failed`) |
+| `OrderService` | Pendente |
+| `InventoryService` | Pendente |
+| `PaymentService` | Pendente |
+| `ShipmentService` | Pendente |
+| `TrackingService` | Pendente |
+
+Os produtores pendentes constroem o envelope em pontos diferentes do código (alguns no momento da escrita no outbox, outros só no dispatcher em background, onde não há mais uma `Activity` HTTP ativa); adicionar os campos nesses casos exige capturar `traceId`/`spanId` no momento da escrita e propagá-los até o dispatcher, o que é maior que uma mudança aditiva de uma linha. Tratar como trabalho de acompanhamento, não bloqueador — o `OrderVisibilityService` já funciona plenamente via busca por `correlation.id` no Jaeger quando `traceId` está ausente.
 
 ## Matriz resumida
 

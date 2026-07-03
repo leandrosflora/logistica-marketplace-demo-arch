@@ -5,6 +5,7 @@
 title Logística Envios - C4 Nível 2 - Containers (implementação atual)
 
 Person(buyer, "Comprador")
+Person(operator, "Operação/Suporte")
 System_Ext(paymentProvider, "Provedor de pagamento externo/simulado", "Dependência pendente para consumir payment.commands")
 System_Ext(carrierProvider, "Transportadoras externas", "Correios, last-mile e parceiros")
 
@@ -23,6 +24,7 @@ System_Boundary(platform, "Logística Envios Platform") {
   Container(shipment, "Shipment Service", ".NET 8", "Cria shipment, pacotes, etiqueta e comandos para carrier.")
   Container(tracking, "Tracking Service", ".NET 8", "Mantém linha do tempo e status de entrega.")
   Container(notification, "Notification Service", ".NET 8", "Planeja e envia notificações Email/SMS/Push.")
+  Container(orderVisibility, "Order Visibility Service", ".NET 8", "Consumidor passivo da jornada; mantém read model de status/timeline e serve a tela Order Monitor via REST + SignalR.")
 
   ContainerDb(kafka, "Kafka", "Event Streaming", "Eventos implementados, comandos internos e tópicos pendentes da saga.")
   ContainerDb(postgres, "Postgres / RDS", "Relational DB", "Schemas/connections por microservice conforme código.")
@@ -31,6 +33,7 @@ System_Boundary(platform, "Logística Envios Platform") {
 }
 
 Rel(buyer, bff, "Usa")
+Rel(operator, orderVisibility, "Consulta status/timeline de pedidos e realtime via REST + SignalR (tela Order Monitor)")
 Rel(bff, productSearch, "Busca produtos")
 Rel(bff, checkout, "Cria/consulta/confirma checkout")
 Rel(checkout, promise, "Solicita cotação HTTP")
@@ -49,6 +52,7 @@ Rel(fc, kafka, "Consome fulfillment.commands; publica eventos de capacidade")
 Rel(shipment, kafka, "Consome order.created/shipment.commands; publica shipment.created")
 Rel(tracking, kafka, "Consome shipment.created; publica shipment.status.updated")
 Rel(notification, kafka, "Consome eventos configurados para notificação")
+Rel(orderVisibility, kafka, "Consome checkout.confirmed/order.created e eventos de inventory/fulfillment/payment/shipment/tracking; não publica")
 Rel(order, paymentProvider, "Emite payment.commands; consumidor real não implementado")
 
 Rel(carrier, carrierProvider, "Consulta disponibilidade")
@@ -68,6 +72,7 @@ Rel(order, postgres, "Lê/grava OrderDb")
 Rel(shipment, postgres, "Lê/grava ShipmentDb")
 Rel(tracking, postgres, "Lê/grava TrackingDb")
 Rel(notification, postgres, "Lê/grava NotificationDb")
+Rel(orderVisibility, postgres, "Lê/grava order_visibility (order_journey, order_journey_events)")
 
 Rel(promise, redis, "Cache shipping-promise")
 Rel(catalog, redis, "Cache de atributos")

@@ -1,0 +1,95 @@
+{
+  "id": null,
+  "uid": "order-journey-overview",
+  "title": "Order Journey Overview",
+  "tags": ["order-visibility", "logistica-envios"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pedidos por status (taxa/min)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(order_journey_status_total[1m])) by (status) * 60", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Pedidos com erro (taxa/min)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(order_journey_failed_total[1m])) by (error_reason) * 60", "legendFormat": "{{error_reason}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Pedidos travados",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(increase(order_journey_stuck_total[5m]))" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Eventos consumidos por minuto",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 6, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(order_journey_events_consumed_total[1m])) by (event_type) * 60", "legendFormat": "{{event_type}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Duração da jornada — P50/P95/P99 (s)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(order_journey_duration_seconds_bucket[15m])) by (le))", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(order_journey_duration_seconds_bucket[15m])) by (le))", "legendFormat": "P95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(order_journey_duration_seconds_bucket[15m])) by (le))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Falhas por etapa (status)",
+      "type": "bargauge",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "sum(increase(order_journey_failed_total[1h])) by (error_reason)", "legendFormat": "{{error_reason}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Top eventos de erro (1h)",
+      "type": "table",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "topk(10, sum(increase(order_journey_failed_total[1h])) by (error_reason))", "format": "table", "instant": true }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Consumer lag do OrderVisibilityService",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        { "expr": "order_journey_consumer_lag", "legendFormat": "lag" }
+      ]
+    }
+  ]
+}

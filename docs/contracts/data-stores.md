@@ -36,6 +36,7 @@ Este arquivo foi atualizado em **2026-06-25** após varredura dos bootstraps (`P
 | Tracking Service | `TrackingDb` | ShipmentTracking e TrackingEvent | Não registrado no bootstrap atual | Consome `shipment.created`; publica `shipment.status.updated` |
 | Notification Service | `NotificationDb` | Notifications, deliveries, preferences, outbox/inbox | Não registrado no bootstrap atual | Consome eventos configurados em `KafkaOptions`; publica via canais externos Email/SMS/Push, não eventos canônicos |
 | Audit Service | Schema Postgres `audit` (search_path); acesso via Dapper/Npgsql, não EF Core | `AuditEntry` (imutável), inbox | Não registrado no bootstrap atual | Consome os dez tópicos canônicos com producer real; não publica eventos |
+| Order Visibility Service | Schema Postgres `order_visibility` (`OrderVisibilityDb`) | `order_journey` (status consolidado) e `order_journey_events` (timeline), read model próprio — não é fonte transacional | Não registrado no bootstrap atual | Consome `checkout.confirmed`, `order.created`, eventos de inventory/fulfillment/payment/shipment/tracking (exceto todos os `*.commands`); não publica eventos, apenas SignalR para a UI |
 
 ## Infraestrutura local
 

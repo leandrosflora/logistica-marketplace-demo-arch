@@ -1,0 +1,76 @@
+{
+  "id": null,
+  "uid": "kafka-journey-health",
+  "title": "Kafka Journey Health",
+  "tags": ["order-visibility", "logistica-envios", "kafka"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Throughput por tópico (eventos/min, visto pelo OrderVisibilityService)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(order_journey_events_consumed_total[1m])) by (topic) * 60", "legendFormat": "{{topic}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Consumer lag total (OrderVisibilityService)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "order_journey_consumer_lag", "legendFormat": "lag" }
+      ],
+      "description": "Lag agregado entre todas as partitions assinadas. Não é possível quebrar por tópico individual nesta versão do OrderVisibilityService (ver docs/services/order-visibility-service.md, seção de limitações)."
+    },
+    {
+      "id": 3,
+      "title": "Taxa de erro de processamento (falhas/min)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(order_journey_failed_total[1m])) by (error_reason) * 60", "legendFormat": "{{error_reason}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "DLQ por tópico",
+      "type": "text",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+      "options": {
+        "content": "Não há Dead Letter Queue implementada em nenhum serviço deste repositório hoje (ver meli-envios-architecture/docs/contracts/kafka-events.md). Painel mantido como placeholder para quando uma DLQ for adotada."
+      }
+    },
+    {
+      "id": 5,
+      "title": "Duração por etapa — checkout.confirmed → order.created (P50/P95, s)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(order_journey_step_duration_seconds_bucket{status=\"CheckoutConfirmed\"}[15m])) by (le))", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(order_journey_step_duration_seconds_bucket{status=\"CheckoutConfirmed\"}[15m])) by (le))", "legendFormat": "P95" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Duração por etapa — order.created até o próximo evento (P50/P95, s)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(order_journey_step_duration_seconds_bucket{status=\"OrderCreated\"}[15m])) by (le))", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(order_journey_step_duration_seconds_bucket{status=\"OrderCreated\"}[15m])) by (le))", "legendFormat": "P95" }
+      ],
+      "description": "order_journey_step_duration_seconds mede o tempo de UM salto (status atual até o próximo evento recebido), não o caminho completo até shipment.created — o próximo evento após order.created normalmente é inventory.reserved, não shipment.created. Para o tempo completo order.created → shipment.created seria necessário somar os saltos intermediários (InventoryReserved, FulfillmentReserved, PaymentAuthorized) ou adicionar uma métrica dedicada; não implementado nesta versão."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+@startuml
+title 18 - Order Visibility Service - Consumidor Passivo da Jornada
+
+autonumber
+queue "Kafka" as Kafka
+participant "Checkout Service" as Checkout
+participant "Order Service" as Order
+participant "Inventory Service" as Inventory
+participant "Fulfillment Center Service" as FC
+participant "Payment Service" as Payment
+participant "Shipment Service" as Shipment
+participant "Tracking Service" as Tracking
+participant "Order Visibility Service" as OVS
+database "order_visibility (Postgres)" as OvsDb
+participant "SignalR Hub\n(/order-journeys/hub)" as Hub
+participant "MarketplaceWeb\n(Order Monitor)" as UI
+
+note over OVS
+  OVS assina os mesmos tópicos consumidos pela saga, mas em um
+  consumer group independente ("order-visibility-service"). Nunca
+  publica comandos nem participa da saga — apenas projeta o estado.
+end note
+
+Checkout -> Kafka: checkout.confirmed
+Kafka -> Order: checkout.confirmed
+Kafka -> OVS: checkout.confirmed
+activate OVS
+OVS -> OvsDb: Cria order_journey por correlationId\n(orderId ainda nulo)
+OVS -> Hub: OrderJourneyCreated
+Hub -> UI: broadcast (grupo orders:all / correlation:{id})
+deactivate OVS
+
+Order -> Kafka: order.created
+Kafka -> OVS: order.created
+activate OVS
+OVS -> OvsDb: Backfill orderId/checkoutId na jornada existente
+OVS -> Hub: OrderJourneyUpdated
+deactivate OVS
+
+Inventory -> Kafka: inventory.reserved
+FC -> Kafka: fulfillment.capacity.reserved
+Payment -> Kafka: payment.approved
+Kafka -> OVS: inventory.reserved / fulfillment.capacity.reserved / payment.approved
+activate OVS
+OVS -> OvsDb: Avança status + grava evento na timeline\n(idempotente por eventId, transação única)
+OVS -> Hub: OrderJourneyUpdated (a cada evento)
+deactivate OVS
+
+Shipment -> Kafka: shipment.created
+Tracking -> Kafka: shipment.status.updated
+Kafka -> OVS: shipment.created / shipment.status.updated
+activate OVS
+OVS -> OvsDb: Status final (ex.: InTransit)
+OVS -> Hub: OrderJourneyUpdated
+deactivate OVS
+
+UI -> OVS: GET /order-journeys/{orderId} (consulta sob demanda)
+OVS --> UI: Status consolidado + timeline
+
+note over OVS, UI
+  Se OVS ficar indisponível, a saga em Order/Inventory/Fulfillment/
+  Payment/Shipment/Tracking continua normalmente — apenas a tela
+  operacional fica desatualizada.
+end note
+
+@enduml

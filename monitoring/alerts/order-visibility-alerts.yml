@@ -1,0 +1,38 @@
+groups:
+  - name: order-visibility
+    rules:
+      - alert: OrderJourneyStuck
+        expr: order_journey_stuck_total > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Há pedidos travados na jornada"
+          description: "order_journey_stuck_total está acima de zero há mais de 1 minuto. Abra o Order Monitor (/operations/orders?StuckOnly=true) para identificar os pedidos afetados."
+
+      - alert: OrderJourneyHighPaymentRejectionRate
+        expr: rate(order_journey_failed_total{error_reason=~".*payment.*"}[10m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa elevada de falhas de pagamento na jornada de pedidos"
+          description: "Mais de 20% dos eventos de falha nos últimos 10 minutos têm error_reason relacionado a pagamento."
+
+      - alert: OrderVisibilityConsumerLagHigh
+        expr: order_journey_consumer_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer lag alto no OrderVisibilityService"
+          description: "order_journey_consumer_lag está acima de 1000 mensagens por mais de 5 minutos; a visão operacional pode estar desatualizada."
+
+      - alert: OrderJourneyDurationP95High
+        expr: histogram_quantile(0.95, sum(rate(order_journey_duration_seconds_bucket[15m])) by (le)) > 1800
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 da duração da jornada de pedidos acima do esperado"
+          description: "O P95 de order_journey_duration_seconds está acima de 30 minutos nos últimos 15 minutos."
