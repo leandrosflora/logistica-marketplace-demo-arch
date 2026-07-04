@@ -1442,6 +1442,7 @@ ALTER TABLE product_catalog.products ADD COLUMN IF NOT EXISTS seller_id uuid;
 ALTER TABLE product_catalog.products ADD COLUMN IF NOT EXISTS price numeric(18,2) DEFAULT 0;
 ALTER TABLE product_catalog.products ADD COLUMN IF NOT EXISTS is_fragile boolean DEFAULT false;
 ALTER TABLE product_catalog.products ADD COLUMN IF NOT EXISTS is_restricted boolean DEFAULT false;
+ALTER TABLE product_catalog.products ADD COLUMN IF NOT EXISTS image_url text;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_product_catalog_products_id ON product_catalog.products (id);
 
 CREATE TABLE IF NOT EXISTS product_catalog.outbox_messages (
@@ -2084,7 +2085,9 @@ SET
     seller_id = COALESCE(seller_id, '22222222-2222-2222-2222-222222222222'),
     price = CASE WHEN price = 0 THEN 1299.90 ELSE price END,
     is_fragile = true,
-    is_restricted = false
+    is_restricted = false,
+    -- Galaxy J SC-02F Lapis Blue 1.jpg, author: Qurren, license: CC BY-SA 3.0
+    image_url = COALESCE(image_url, 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Galaxy_J_SC-02F_Lapis_Blue_1.jpg')
 WHERE sku_id = '11111111-1111-1111-1111-111111111111';
 
 -- ProductCatalogService reads id/seller_id/price/is_fragile/is_restricted from this same
@@ -2096,7 +2099,9 @@ SET
     seller_id = COALESCE(seller_id, '22222222-2222-2222-2222-222222222222'),
     price = CASE WHEN price = 0 THEN 129.90 ELSE price END,
     is_fragile = false,
-    is_restricted = true
+    is_restricted = true,
+    -- Powerbeats Pro 2 Black model - 1.jpg, author: Kyu3a, license: CC BY-SA 4.0
+    image_url = COALESCE(image_url, 'https://upload.wikimedia.org/wikipedia/commons/a/ae/Powerbeats_Pro_2_Black_model_-_1.jpg')
 WHERE sku_id = '11111111-1111-1111-1111-111111111112';
 
 -- 18 additional products (sku_id continues the existing 11111111-...-1111111111XX prefix)
@@ -2104,46 +2109,85 @@ WHERE sku_id = '11111111-1111-1111-1111-111111111112';
 -- >= 10kg used to exercise the heavier routing/carrier/pricing lanes added below.
 -- id is set equal to sku_id here for simplicity (they are independent columns; nothing
 -- requires them to differ).
+-- Image sourcing: curated Wikimedia Commons URLs baked in at seed time (see design.md,
+-- openspec/changes/product-images). Public domain/CC0 preferred; author+license recorded
+-- as a comment for each row where the image is CC-BY/CC-BY-SA.
 INSERT INTO product_catalog.products (
     sku_id, title, category, weight_kg, height_cm, width_cm, length_cm, status, created_at, updated_at,
-    id, seller_id, price, is_fragile, is_restricted
+    id, seller_id, price, is_fragile, is_restricted, image_url
 ) VALUES
+    -- image: MSI Gaming Laptop on wood floor.jpg, author: Kurt Kaiser, license: CC0
     ('11111111-1111-1111-1111-111111111113', 'Notebook Gamer Demo', 'electronics', 2.800, 5.00, 40.00, 30.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111113', '22222222-2222-2222-2222-222222222222', 4599.00, true, false),
+     '11111111-1111-1111-1111-111111111113', '22222222-2222-2222-2222-222222222222', 4599.00, true, false,
+     'https://upload.wikimedia.org/wikipedia/commons/c/c9/MSI_Gaming_Laptop_on_wood_floor.jpg'),
+    -- image: Powerbank integrated charging controller with LEDs and heat sink (Selectec HYT-Q3).jpg, author: KalteSonne, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111114', 'Carregador Portatil Demo', 'electronics', 0.200, 3.00, 8.00, 15.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111114', '22222222-2222-2222-2222-222222222222', 89.90, false, true),
+     '11111111-1111-1111-1111-111111111114', '22222222-2222-2222-2222-222222222222', 89.90, false, true,
+     'https://upload.wikimedia.org/wikipedia/commons/8/89/Powerbank_integrated_charging_controller_with_LEDs_and_heat_sink_%28Selectec_HYT-Q3%29.jpg'),
+    -- image: Electric Brew Coffee Maker.jpg, author: GautamSudhanshu, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111115', 'Cafeteira Eletrica Demo', 'home', 3.500, 30.00, 25.00, 35.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111115', '22222222-2222-2222-2222-222222222222', 349.90, false, false),
+     '11111111-1111-1111-1111-111111111115', '22222222-2222-2222-2222-222222222222', 349.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/0/0b/Electric_Brew_Coffee_Maker.jpg'),
+    -- image: Cooking pots.jpg, author: Poecus, license: Public domain
     ('11111111-1111-1111-1111-111111111116', 'Conjunto de Panelas Demo', 'home', 4.200, 20.00, 40.00, 40.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111116', '22222222-2222-2222-2222-222222222222', 599.90, true, false),
+     '11111111-1111-1111-1111-111111111116', '22222222-2222-2222-2222-222222222222', 599.90, true, false,
+     'https://upload.wikimedia.org/wikipedia/commons/6/65/Cooking_pots.jpg'),
+    -- image: White desk light.jpg, author: Thidapa, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111117', 'Luminaria de Mesa Demo', 'home', 1.100, 45.00, 15.00, 15.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111117', '22222222-2222-2222-2222-222222222222', 179.90, true, false),
+     '11111111-1111-1111-1111-111111111117', '22222222-2222-2222-2222-222222222222', 179.90, true, false,
+     'https://upload.wikimedia.org/wikipedia/commons/0/09/White_desk_light.jpg'),
+    -- image: Dragon Ball action toy in india.jpg, author: Suyash Dwivedi, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111118', 'Boneco de Acao Colecionavel Demo', 'toys', 0.300, 10.00, 8.00, 25.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111118', '22222222-2222-2222-2222-222222222222', 129.90, false, false),
+     '11111111-1111-1111-1111-111111111118', '22222222-2222-2222-2222-222222222222', 129.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/2/2f/Dragon_Ball_action_toy_in_india.jpg'),
+    -- image: Trefl Puzzles 1000 pieces.jpg, author: Mosbatho, license: CC BY 4.0
     ('11111111-1111-1111-1111-111111111119', 'Quebra-Cabeca 1000 Pecas Demo', 'toys', 0.700, 30.00, 20.00, 5.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111119', '22222222-2222-2222-2222-222222222222', 79.90, false, false),
+     '11111111-1111-1111-1111-111111111119', '22222222-2222-2222-2222-222222222222', 79.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/9/92/Trefl_Puzzles_1000_pieces.jpg'),
+    -- image: On Clouds running shoes.jpg, author: Goodreg3, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111120', 'Tenis Esportivo Demo', 'fashion', 0.900, 12.00, 20.00, 30.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111120', '22222222-2222-2222-2222-222222222222', 349.90, false, false),
+     '11111111-1111-1111-1111-111111111120', '22222222-2222-2222-2222-222222222222', 349.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/8/89/On_Clouds_running_shoes.jpg'),
+    -- image: Windbreaker Jacket, Hood Outside.jpg, author: Ingolfson, license: Public domain
     ('11111111-1111-1111-1111-111111111121', 'Jaqueta Corta-Vento Demo', 'fashion', 0.450, 5.00, 30.00, 40.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111121', '22222222-2222-2222-2222-222222222222', 219.90, false, false),
+     '11111111-1111-1111-1111-111111111121', '22222222-2222-2222-2222-222222222222', 219.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/4/46/Windbreaker_Jacket%2C_Hood_Outside.jpg'),
+    -- image: HK backpack bag XD Design Bobby Urban grey September 2022 Px3 01.jpg, author: Hjfm 003, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111122', 'Mochila Executiva Demo', 'fashion', 0.850, 45.00, 30.00, 15.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111122', '22222222-2222-2222-2222-222222222222', 289.90, false, false),
+     '11111111-1111-1111-1111-111111111122', '22222222-2222-2222-2222-222222222222', 289.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/2/29/HK_backpack_bag_XD_Design_Bobby_Urban_grey_September_2022_Px3_01.jpg'),
+    -- image: Old book bindings.jpg, author: Tom Murphy VII, license: CC BY-SA 3.0
     ('11111111-1111-1111-1111-111111111123', 'Livro Best-Seller Demo', 'books', 0.400, 20.00, 13.00, 3.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111123', '22222222-2222-2222-2222-222222222222', 59.90, false, false),
+     '11111111-1111-1111-1111-111111111123', '22222222-2222-2222-2222-222222222222', 59.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/8/87/Old_book_bindings.jpg'),
+    -- image: Tactile picture books HP72 C.JPG, author: Anneli Salo, license: CC BY-SA 3.0
     ('11111111-1111-1111-1111-111111111124', 'Kit 3 Livros Infantis Demo', 'books', 0.900, 25.00, 18.00, 6.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111124', '22222222-2222-2222-2222-222222222222', 89.90, false, false),
+     '11111111-1111-1111-1111-111111111124', '22222222-2222-2222-2222-222222222222', 89.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/b/b9/Tactile_picture_books_HP72_C.JPG'),
+    -- image: Molten soccer ball.jpg, author: Vee Satayamas, license: CC BY 4.0
     ('11111111-1111-1111-1111-111111111125', 'Bola de Futebol Demo', 'sports', 0.450, 22.00, 22.00, 22.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111125', '22222222-2222-2222-2222-222222222222', 129.90, false, false),
+     '11111111-1111-1111-1111-111111111125', '22222222-2222-2222-2222-222222222222', 129.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/d/d8/Molten_soccer_ball.jpg'),
+    -- image: Colorful dumbbells of various sizes.jpg, author: Ser Amantio di Nicolao, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111126', 'Kit Halteres 10kg Demo', 'sports', 10.500, 20.00, 20.00, 40.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111126', '22222222-2222-2222-2222-222222222222', 249.90, false, false),
+     '11111111-1111-1111-1111-111111111126', '22222222-2222-2222-2222-222222222222', 249.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/f/f1/Colorful_dumbbells_of_various_sizes.jpg'),
+    -- image: Czech Glass Perfume Bottle-1.jpg, author: Tangerineduel, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111127', 'Perfume Importado 100ml Demo', 'beauty', 0.300, 15.00, 8.00, 8.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111127', '22222222-2222-2222-2222-222222222222', 459.90, true, false),
+     '11111111-1111-1111-1111-111111111127', '22222222-2222-2222-2222-222222222222', 459.90, true, false,
+     'https://upload.wikimedia.org/wikipedia/commons/0/09/Czech_Glass_Perfume_Bottle-1.jpg'),
+    -- image: Makeup cosmetics.jpg, author: Bairavi Arjunan3, license: CC BY-SA 4.0
     ('11111111-1111-1111-1111-111111111128', 'Kit Maquiagem Completo Demo', 'beauty', 0.500, 20.00, 15.00, 10.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111128', '22222222-2222-2222-2222-222222222222', 199.90, false, false),
+     '11111111-1111-1111-1111-111111111128', '22222222-2222-2222-2222-222222222222', 199.90, false, false,
+     'https://upload.wikimedia.org/wikipedia/commons/0/08/Makeup_cosmetics.jpg'),
+    -- image: Power bank.JPG, author: Ilya Plekhanov, license: CC BY-SA 3.0
     ('11111111-1111-1111-1111-111111111129', 'Powerbank 20000mAh Demo', 'electronics', 0.400, 2.50, 8.00, 15.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111129', '22222222-2222-2222-2222-222222222222', 149.90, false, true),
+     '11111111-1111-1111-1111-111111111129', '22222222-2222-2222-2222-222222222222', 149.90, false, true,
+     'https://upload.wikimedia.org/wikipedia/commons/7/7c/Power_bank.JPG'),
+    -- image: Exotic Fruit Gift Basket (4461109309).jpg, author: Vegan Feast Catering, license: CC BY 2.0
     ('11111111-1111-1111-1111-111111111130', 'Cesta de Cafe da Manha Demo', 'grocery', 2.000, 25.00, 25.00, 15.00, 'Active', now(), now(),
-     '11111111-1111-1111-1111-111111111130', '22222222-2222-2222-2222-222222222222', 179.90, true, false)
+     '11111111-1111-1111-1111-111111111130', '22222222-2222-2222-2222-222222222222', 179.90, true, false,
+     'https://upload.wikimedia.org/wikipedia/commons/c/c7/Exotic_Fruit_Gift_Basket_%284461109309%29.jpg')
 ON CONFLICT (sku_id) DO NOTHING;
 
 INSERT INTO inventory.inventory_items (
