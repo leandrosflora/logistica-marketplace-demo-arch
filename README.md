@@ -4,8 +4,6 @@ Repositório de arquitetura e documentação do case **Logística Marketplace De
 
 ## Estado atual
 
-Status: **documentação alinhada à implementação atual dos microservices em 2026-07-04**.
-
 Esta visão consolida os repositórios de frontend, BFF, microservices, endpoints REST, consumers/producers Kafka, persistência local, observabilidade e lacunas práticas observadas no código.
 
 ## O que este repo documenta
