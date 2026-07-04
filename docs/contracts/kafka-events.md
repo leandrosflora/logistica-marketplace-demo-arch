@@ -80,6 +80,35 @@ Foram considerados:
 | `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService`, `AuditService` | Implementado |
 | `carrier-shipment.commands` | `ShipmentService` | Nenhum consumer localizado | Produzido sem consumidor; integração com carrier pendente/simulada |
 
+### Carrinho
+
+| Tópico | Producer | Consumer | Status prático |
+|---|---|---|---|
+| `cart.abandoned` | `MarketplaceWeb.Bff` | `NotificationService` | Implementado |
+
+`MarketplaceWeb.Bff` publica `cart.abandoned` diretamente (produce sem outbox), não a partir de um outbox/dispatcher como os demais producers deste documento — é uma decisão deliberada: o carrinho é estado efêmero mantido em Redis pela própria BFF (chave `cart:<cartOwnerId>`, ver [data-stores.md](data-stores.md)), e a perda ocasional de um lembrete de carrinho abandonado é de baixa severidade comparado aos eventos de saga (pagamento, estoque). `NotificationService` trata o evento de forma idempotente por `eventId` (mesmo padrão de inbox usado para os demais tópicos consumidos) para tolerar uma eventual redelivery.
+
+Payload do evento:
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "cart.abandoned",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-07-04T12:00:00Z",
+  "correlationId": "uuid",
+  "producer": "marketplaceweb-bff",
+  "payload": {
+    "cartOwnerId": "buyerId (guid) ou \"anon:<guid>\" para carrinhos anônimos",
+    "buyerId": "guid | null — null quando o carrinho nunca foi associado a uma conta autenticada",
+    "items": [ { "skuId": "guid", "quantity": 1 } ],
+    "lastActivityAt": "2026-07-04T11:00:00Z"
+  }
+}
+```
+
+Quando `buyerId` é `null` (carrinho abandonado por um visitante anônimo que nunca fez login), `NotificationService` consome o evento e não envia lembrete algum (sem destinatário conhecido) — não é tratado como erro.
+
 ## Tópicos configurados em consumer, mas sem producer implementado
 
 Os tópicos abaixo aparecem em configurações de consumer, principalmente no `NotificationService`, mas não há producer implementado nos microservices atuais:
@@ -164,6 +193,7 @@ Os produtores pendentes constroem o envelope em pontos diferentes do código (al
 | `shipment.status.updated` | `TrackingService` | `OrderService`, `NotificationService`, `AuditService` | Evento implementado |
 | `carrier-shipment.commands` | `ShipmentService` | Não localizado | Pendente |
 | `order.events` | `OrderService` | Interno/controlado | Interno |
+| `cart.abandoned` | `MarketplaceWeb.Bff` | `NotificationService` | Evento implementado (sem outbox — ver seção "Carrinho") |
 
 ## Decisão prática
 

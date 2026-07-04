@@ -51,8 +51,12 @@ paths:
     get:
       tags: [ProductSearchService]
       summary: Busca produtos ativos no read model Postgres
+      description: >-
+        Se `query` for omitido ou vazio, retorna todos os produtos ativos
+        (sem filtro de texto), paginados normalmente. Usado pela home do
+        MarketplaceWeb para listar produtos sem exigir uma busca do usuário.
       parameters:
-        - { name: query, in: query, required: true, schema: { type: string } }
+        - { name: query, in: query, required: false, schema: { type: string } }
         - { name: page, in: query, required: false, schema: { type: integer, default: 1 } }
         - { name: pageSize, in: query, required: false, schema: { type: integer, default: 20 } }
         - { name: zipCode, in: query, required: false, schema: { type: string } }

@@ -136,6 +136,8 @@ docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.cancelled --partitions 1 --replication-factor 1
 
 docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic shipment.creation.failed --partitions 1 --replication-factor 1
+
+docker exec -it logistica-envios-kafka kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic cart.abandoned --partitions 1 --replication-factor 1
 ```
 
 Esses tópicos não devem ser usados como prova de E2E completo sem alteração/validação do código produtor.

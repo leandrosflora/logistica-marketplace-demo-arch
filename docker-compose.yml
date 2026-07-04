@@ -53,12 +53,47 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.57
     container_name: logistica-envios-jaeger
+    user: root
     ports:
       - "16686:16686"  # Jaeger UI
-      - "5107:4317"    # OTLP gRPC
-      - "5108:4318"    # OTLP HTTP
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+      SPAN_STORAGE_TYPE: badger
+      BADGER_EPHEMERAL: "false"
+      BADGER_DIRECTORY_VALUE: /badger/data
+      BADGER_DIRECTORY_KEY: /badger/key
+      BADGER_SPAN_STORE_TTL: 72h
+    volumes:
+      - jaeger-data:/badger
+    profiles:
+      - observability
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: logistica-envios-loki
+    ports:
+      - "3100:3100"
+    command:
+      - "-config.file=/etc/loki/config.yml"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    profiles:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: logistica-envios-otel-collector
+    command:
+      - "--config=/etc/otelcol-contrib/config.yml"
+    ports:
+      - "5107:4317"    # OTLP gRPC
+      - "5108:4318"    # OTLP HTTP
+    volumes:
+      - ./monitoring/otel-collector.yml:/etc/otelcol-contrib/config.yml:ro
+    depends_on:
+      - jaeger
+      - loki
     profiles:
       - observability
 
@@ -89,9 +124,13 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+      - loki
+      - jaeger
     profiles:
       - observability
 
 volumes:
   postgres-data:
   grafana-data:
+  jaeger-data:
+  loki-data:

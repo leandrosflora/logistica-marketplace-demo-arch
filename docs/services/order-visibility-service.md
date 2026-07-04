@@ -2,7 +2,7 @@
 
 ## Responsabilidade
 
-Consome os eventos canônicos da jornada do pedido (checkout → order → inventory/fulfillment → payment → shipment/tracking) e mantém um read model materializado ("status consolidado" + timeline) para consulta operacional em tempo real via API REST e SignalR. Alimenta a tela "Order Monitor" em `MarketplaceWeb` (`/operations/orders`).
+Consome os eventos canônicos da jornada do pedido (checkout → order → inventory/fulfillment → payment → shipment/tracking) e mantém um read model materializado ("status consolidado" + timeline) para consulta operacional em tempo real via API REST e SignalR. Alimenta a tela "Order Monitor" em `MarketplaceWeb` (`/admin/operations/orders`).
 
 **Não é** o dono transacional de nenhum dado de negócio, **não** orquestra a saga, **não** publica comandos e **não** executa compensação — quem faz isso é o `OrderService`. Uma indisponibilidade deste serviço não afeta o processamento da saga em nenhum outro serviço (ver design.md em `openspec/changes/order-visibility-realtime/`).
 
@@ -53,7 +53,7 @@ Nenhum tópico `*.commands` é consumido: comando representa intenção, não fa
 
 ## Dependências síncronas
 
-Nenhuma dependência síncrona de outro serviço. `MarketplaceWeb` chama este serviço via HTTP para renderizar a tela `/operations/orders`.
+Nenhuma dependência síncrona de outro serviço. `MarketplaceWeb` chama este serviço via HTTP para renderizar a tela `/admin/operations/orders`.
 
 ## Persistência e infraestrutura
 

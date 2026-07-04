@@ -14,7 +14,7 @@ Decisão arquitetural relacionada: [ADR-0006 — Stack de Observabilidade](../ad
 |---|---|---|
 | Jaeger UI | `http://localhost:16686` | Nenhuma |
 | Prometheus | `http://localhost:9090` | Nenhuma |
-| Grafana | `http://localhost:3000` | `admin` / `logistica` |
+| Grafana | `http://localhost:3003` | `admin` / `logistica` |
 | Kafka UI | `http://localhost:8088` | Nenhuma |
 
 ---
@@ -73,7 +73,7 @@ builder.Services.AddOpenTelemetry()
                 .AddService(serviceName: "shipment-service", serviceVersion: "1.0.0"))
             .AddOtlpExporter(opts =>
             {
-                opts.Endpoint = new Uri("http://localhost:4317");
+                opts.Endpoint = new Uri("http://localhost:5107");
                 opts.Protocol = OtlpExportProtocol.Grpc;
             });
     })
@@ -94,7 +94,7 @@ app.MapPrometheusScrapingEndpoint();
 ```json
 {
   "OpenTelemetry": {
-    "OtlpEndpoint": "http://localhost:4317",
+    "OtlpEndpoint": "http://localhost:5107",
     "ServiceName": "shipment-service"
   }
 }
@@ -148,7 +148,7 @@ Com o `correlationId`, busque no Jaeger por `correlation.id=<valor>` para ver to
 
 ## Visualizar métricas no Grafana
 
-1. Acesse `http://localhost:3000` (login: `admin` / `logistica`).
+1. Acesse `http://localhost:3003` (login: `admin` / `logistica`).
 2. Vá em **Explore** → selecione datasource **Prometheus**.
 3. Métricas úteis:
    - `http_server_duration_milliseconds_bucket` — latência HTTP por serviço.
@@ -179,6 +179,40 @@ curl 'http://localhost:9090/api/v1/query?query=up'
 
 1. A stack de observabilidade usa `--profile observability` e NÃO inicia automaticamente com `docker compose up -d`.
 2. Microservices devem expor `/metrics` na porta configurada para scrape pelo Prometheus.
-3. O endpoint OTLP do Jaeger é `localhost:4317` (gRPC) ou `localhost:4318` (HTTP) para apps rodando fora do Docker.
-4. Para apps dentro do Docker, use `jaeger:4317` como endpoint OTLP.
+3. O endpoint OTLP local é o Collector: `localhost:5107` (gRPC) ou `localhost:5108` (HTTP) para apps rodando fora do Docker.
+4. Para apps dentro do Docker, use `otel-collector:4317` como endpoint OTLP.
 5. Dados de observabilidade são efêmeros: `docker compose down -v` remove volumes de Grafana e Prometheus.
+
+---
+
+## Logs com Loki e OpenTelemetry Collector
+
+A stack local tambem sobe:
+
+- `otel-collector`: ponto unico OTLP para apps .NET em `localhost:5107` (gRPC) e `localhost:5108` (HTTP).
+- `loki`: armazenamento e consulta de logs em `localhost:3100`.
+- datasource `Loki` no Grafana em `http://localhost:3003`.
+
+Fluxo local:
+
+```text
+.NET services -> OTLP logs/traces -> OpenTelemetry Collector
+Collector traces -> Jaeger
+Collector logs -> Loki
+Grafana Explore -> Loki logs com link para Jaeger por traceId
+```
+
+Para consultar logs:
+
+1. Acesse `http://localhost:3003` com `admin` / `logistica`.
+2. Abra **Explore** e selecione o datasource **Loki**.
+3. Consulte por servico, por exemplo:
+
+```logql
+{service_name="CheckoutService"}
+```
+
+4. Abra os detalhes de uma linha de log. Quando houver `traceId`, o campo derivado `traceId` aponta para o datasource **Jaeger**.
+
+Para apps rodando fora do Docker, use `OpenTelemetry:OtlpEndpoint=http://localhost:5107`.
+Para apps rodando dentro do Docker Compose, use `OpenTelemetry:OtlpEndpoint=http://otel-collector:4317`.

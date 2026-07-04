@@ -8,7 +8,7 @@ groups:
           severity: warning
         annotations:
           summary: "Há pedidos travados na jornada"
-          description: "order_journey_stuck_total está acima de zero há mais de 1 minuto. Abra o Order Monitor (/operations/orders?StuckOnly=true) para identificar os pedidos afetados."
+          description: "order_journey_stuck_total está acima de zero há mais de 1 minuto. Abra o Order Monitor (/admin/operations/orders?StuckOnly=true) para identificar os pedidos afetados."
 
       - alert: OrderJourneyHighPaymentRejectionRate
         expr: rate(order_journey_failed_total{error_reason=~".*payment.*"}[10m]) > 0.2

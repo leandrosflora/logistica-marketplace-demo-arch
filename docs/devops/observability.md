@@ -13,7 +13,7 @@ Rastreabilidade ponta a ponta e sinais operacionais para detecção, diagnóstic
 | Instrumentação | OpenTelemetry SDK (.NET) | Traces, métricas e logs em padrão aberto |
 | Traces | Jaeger (local) / AWS X-Ray (prod) | Rastreio distribuído entre serviços |
 | Métricas | Prometheus + Grafana | Coleta, armazenamento e dashboards |
-| Logs | JSON estruturado → CloudWatch / OpenSearch | Busca e correlação por `traceId` |
+| Logs | JSON estruturado + OTLP -> OpenTelemetry Collector -> Loki (local) / CloudWatch ou OpenSearch (prod) | Busca e correlacao por `traceId` |
 
 Todos os microservices DEVEM emitir os três sinais (traces, métricas, logs) via `OpenTelemetry.Extensions.Hosting`.
 
@@ -24,8 +24,38 @@ Todos os microservices DEVEM emitir os três sinais (traces, métricas, logs) vi
 | Campo | Veículo HTTP | Veículo Kafka | Obrigatoriedade |
 |---|---|---|---|
 | `traceId` / `spanId` | `traceparent` (W3C) | Header Kafka `traceparent` | Obrigatório |
+| `tracestate` | `tracestate` (W3C) | Header Kafka `tracestate` | Opcional; propagar quando existir |
 | `x-correlation-id` | Header HTTP | Envelope Kafka `correlationId` | Obrigatório |
 | `x-idempotency-key` | Header HTTP (writes) | — | Obrigatório em comandos |
+
+### Kafka e W3C Trace Context
+
+Todos os producers e consumers Kafka relevantes para a jornada de checkout/envio registram o `ActivitySource` compartilhado `Meli.Kafka` e exportam spans via OTLP para o Jaeger.
+
+Os producers DEVEM:
+
+- criar span `Kafka produce <topic>` com `ActivityKind.Producer`;
+- adicionar tags `messaging.system=kafka`, `messaging.destination.name`, `messaging.kafka.topic`, `messaging.event.name` e `correlation.id`;
+- injetar nos headers Kafka `traceparent` e, quando existir, `tracestate`;
+- manter headers de diagnóstico existentes, como `eventType` e `correlationId`.
+
+Os consumers DEVEM:
+
+- extrair `traceparent`/`tracestate` dos headers Kafka;
+- criar span `Kafka consume <topic>` com `ActivityKind.Consumer`;
+- criar span filho `Process <event-name>` ao executar a regra de negócio do evento/comando;
+- garantir que chamadas HTTP, banco de dados e novos publishes Kafka executem com o span de processamento como `Activity.Current`.
+
+Nomes padronizados:
+
+| Tipo | Nome |
+|---|---|
+| API HTTP | `HTTP <METHOD> <ROUTE>` via instrumentação AspNetCore |
+| Producer Kafka | `Kafka produce <topic>` |
+| Consumer Kafka | `Kafka consume <topic>` |
+| Processamento | `Process <event-name>` |
+
+Serviços instrumentados com spans Kafka: `checkout-service`, `shipping-promise-service`, `order-service`, `inventory-service`, `fulfillment-center-service`, `payment-service`, `shipment-service`, `tracking-service`, `notification-service`, `audit-service` e `order-visibility-service`.
 
 ---
 
@@ -231,6 +261,48 @@ POST /api/web/v1/checkouts
 Todos os spans devem incluir: `traceId`, `spanId`, `parentSpanId`, `service.name`, `duration`, `http.status_code` e `db.statement` (quando aplicável).
 
 ---
+
+## Validação de trace Kafka ponta a ponta
+
+Exemplo esperado para a jornada de checkout/envio no Jaeger:
+
+```text
+HTTP POST /api/web/v1/checkouts
+└── checkout-service: postgres INSERT checkout
+└── Kafka produce checkout.shipping.quote.requested
+    └── Kafka consume checkout.shipping.quote.requested
+        └── Process checkout.shipping.quote.requested
+            ├── HTTP GET/POST product-catalog/inventory/fulfillment/routing/carrier/pricing
+            └── Kafka produce shipping.promise.calculated
+                └── Kafka consume shipping.promise.calculated
+                    └── Process shipping.promise.calculated
+                        └── postgres UPDATE checkout (ShippingPromiseProjection)
+
+HTTP POST /api/web/v1/checkouts/{id}/confirm
+└── Kafka produce checkout.confirmed
+    └── Kafka consume checkout.confirmed
+        └── Process checkout.confirmed
+            └── Kafka produce order.created / inventory.commands / fulfillment.commands
+                ├── Kafka consume inventory.commands
+                ├── Kafka consume fulfillment.commands
+                ├── Kafka consume payment.commands
+                ├── Kafka consume shipment.commands
+                └── Kafka consume order.events
+```
+
+Passos de validação:
+
+1. Suba a stack local com Jaeger/OTLP (`docker compose --profile observability up`) e execute os serviços relevantes apontando `OpenTelemetry:OtlpEndpoint` para `http://localhost:5107`.
+2. Execute uma jornada completa de checkout/envio: criação de checkout, confirmação, criação de pedido, reservas, pagamento, envio e eventos finais da saga.
+3. Abra `http://localhost:16686`.
+4. Pesquise pelo `service.name` de entrada, normalmente `CheckoutService` ou `MarketplaceWeb.Bff`.
+5. Confirme que o trace possui um único `traceId` atravessando spans HTTP, `Kafka produce <topic>`, `Kafka consume <topic>` e `Process <event-name>`.
+6. Se tiver o `correlationId`, pesquise pelos spans com tag `correlation.id=<valor>` para conferir todos os trechos da jornada.
+
+Limitações conhecidas:
+
+- Alguns dispatchers baseados em outbox publicam mensagens em background depois que a activity HTTP/consumer original já terminou. Quando o outbox ainda não persiste `traceparent`/`tracestate`, o publish span pode iniciar um novo trecho de trace, embora ainda carregue `correlation.id`. A evolução recomendada é persistir `traceparent` e `tracestate` junto do registro de outbox.
+- Eventos antigos ou produzidos antes desta instrumentação podem não conter headers W3C; consumers continuam processando esses casos, mas o Jaeger pode mostrar traces separados.
 
 ## Runbooks relacionados
 

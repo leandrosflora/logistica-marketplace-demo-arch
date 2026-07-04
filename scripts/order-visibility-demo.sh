@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Publishes synthetic order-journey events directly to Kafka so the Order Monitor
-# (MarketplaceWeb /operations/orders) and OrderVisibilityService can be exercised without
+# (MarketplaceWeb /admin/operations/orders) and OrderVisibilityService can be exercised without
 # running the full saga. Requires the local docker compose stack (see
 # docs/runbooks/order-visibility-local.md) with the Kafka container named
 # logistica-envios-kafka, and topics already created per docs/runbooks/kafka-local-e2e.md.

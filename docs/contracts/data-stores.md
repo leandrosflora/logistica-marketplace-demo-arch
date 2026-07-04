@@ -20,7 +20,7 @@ Este arquivo foi atualizado em **2026-06-25** após varredura dos bootstraps (`P
 
 | Serviço | Schema/Banco atual | Dados dominados | Cache | Kafka persistence pattern observado |
 |---|---|---|---|---|
-| Marketplace BFF | Sem banco próprio nesta documentação | Agregação transiente da experiência web | Opcional | Não aplicável neste repo de arquitetura |
+| Marketplace BFF (`MarketplaceWeb.Bff`) | Sem banco próprio | Agregação transiente da experiência web; carrinho de compras (única exceção de estado persistido, ver Observações) | Redis com prefixo `cart:` (chave `cart:<cartOwnerId>`) | Publica `cart.abandoned` diretamente (sem outbox) quando um carrinho fica inativo além do limite configurado |
 | Product Search Service | Connection string `Default`; read model em tabela `products` | Índice/read model de produtos ativos para busca | Não registrado no bootstrap atual | Não usa Kafka diretamente no código atual |
 | Checkout Service | `CheckoutDb`; fallback para mocks se sem connection string | Checkout, itens, idempotência, projeção de promise | Não registrado como Redis no bootstrap atual | Publica `checkout.shipping.quote.requested` e `checkout.confirmed`; consome `shipping.promise.calculated` quando Kafka configurado |
 | Shipping Promise Service | `ShippingPromiseDb` | Promessas calculadas e auditoria/snapshot da composição | Redis com prefixo `shipping-promise:` | Consome `checkout.shipping.quote.requested`; publica `shipping.promise.calculated` |
@@ -65,3 +65,4 @@ O `docker-compose.yml` deste repo fornece infraestrutura compartilhada para dese
 - `ProductSearchService` não deve ser documentado como OpenSearch em produção atual: o código registra `PostgresProductSearchRepository`.
 - `AuditService` usa Dapper/Npgsql em vez de EF Core — escolha arquitetural explícita, não inconsistência a corrigir.
 - Tópicos sem producer implementado devem ser marcados como configurados/pendentes, não como fluxo E2E pronto.
+- O carrinho de compras em `MarketplaceWeb.Bff` (chave Redis `cart:<cartOwnerId>`) é uma exceção deliberada e documentada à regra de que BFFs não possuem estado próprio: é dado efêmero de sessão/UX (não um registro de negócio durável), e a publicação de `cart.abandoned` sem outbox é aceitável porque um lembrete perdido/duplicado tem severidade baixa comparado aos eventos de saga. Não usar este caso como precedente para outros dados de domínio migrarem para uma BFF.

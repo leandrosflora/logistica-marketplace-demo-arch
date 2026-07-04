@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Guiar a execução local do `OrderVisibilityService` e do Order Monitor (`MarketplaceWeb` em `/operations/orders`), permitindo reproduzir uma jornada de pedido do zero e investigá-la ponta a ponta (status, timeline, trace, métricas).
+Guiar a execução local do `OrderVisibilityService` e do Order Monitor (`MarketplaceWeb` em `/admin/operations/orders`), permitindo reproduzir uma jornada de pedido do zero e investigá-la ponta a ponta (status, timeline, trace, métricas).
 
 ## 1. Subir Kafka, Postgres, Jaeger, Prometheus e Grafana
 
@@ -69,7 +69,7 @@ O script gera `correlationId`/`checkoutId`/`orderId` novos a cada execução e i
 
 ## 5. Abrir a tela operacional
 
-Acesse `http://localhost:5130/operations/orders` (ou a porta configurada em `MarketplaceWeb`). A lista atualiza sozinha a cada ~4s (polling; ver nota abaixo sobre SignalR). Use os filtros de status, erro, travados, orderId, checkoutId, correlationId, buyerId, sellerId.
+Acesse `http://localhost:5130/admin/operations/orders` (ou a porta configurada em `MarketplaceWeb`). A lista atualiza sozinha a cada ~4s (polling; ver nota abaixo sobre SignalR). Use os filtros de status, erro, travados, orderId, checkoutId, correlationId, buyerId, sellerId.
 
 > **Nota sobre realtime**: o hub SignalR (`/order-journeys/hub`) está implementado no `OrderVisibilityService`, mas o cliente JS do `MarketplaceWeb` ainda não foi conectado a ele — trazer um cliente de terceiros (`@microsoft/signalr`) para `wwwroot` exigiria passar pelo processo normal de dependências do time (npm/libman com revisão), o que não foi feito nesta mudança. A lista funciona hoje via polling da API REST, que já entrega a mesma informação com um atraso de poucos segundos.
 
