@@ -1,37 +1,38 @@
-# Logistica Envios Demo Architecture
+# Logistica Marketplace Demo Architecture
 
-Repositorio de arquitetura e documentacao do case **Logistica de Envios**.
+Repositório de arquitetura e documentação do case **Logística Marketplace Demo**.
 
 ## Estado atual
 
-Status: **documentacao alinhada a implementacao atual dos microservices em 2026-07-02**.
+Status: **documentação alinhada à implementação atual dos microservices em 2026-07-04**.
 
-Esta visao reflete os repositorios de microservices, endpoints REST, consumers/producers Kafka, persistencia local e lacunas praticas observadas no codigo.
+Esta visão consolida os repositórios de frontend, BFF, microservices, endpoints REST, consumers/producers Kafka, persistência local, observabilidade e lacunas práticas observadas no código.
 
 ## O que este repo documenta
 
-- Canal web, BFF e microservices implementados.
+- Canal web do marketplace, BFF e microservices implementados.
 - Contratos REST consolidados.
 - Eventos e comandos Kafka usados na jornada.
-- Saga de pedido, pagamento, shipment, tracking, notificacao, auditoria e visibilidade operacional.
-- Bancos, schemas e padroes Inbox/Outbox.
-- Diagramas C4, sequencias e runbooks de validacao local.
+- Carrinho efêmero no BFF com Redis e evento `cart.abandoned`.
+- Saga de checkout, pedido, estoque, fulfillment, pagamento, shipment, tracking, notificação, auditoria e visibilidade operacional.
+- Bancos, schemas, caches e padrões Inbox/Outbox.
+- Diagramas C4, sequências e runbooks de validação local.
 
 ## Estrutura
 
 ```text
-logistica-envios-demo-arch
+logistica-marketplace-demo-arch
 ├── docs/
-│   ├── adr/                    # Decisoes arquiteturais
+│   ├── adr/                    # Decisões arquiteturais
 │   ├── c4/                     # Diagramas C4 (PlantUML + SVG)
 │   ├── cicd/                   # Pipeline CI/CD
 │   ├── contracts/              # Contratos REST, Kafka, dados e schema governance
-│   ├── glossary/               # Glossario de dominio
-│   ├── prompts/                # Prompts para Codex
-│   ├── reviews/                # Reviews e validacoes
-│   ├── runbooks/               # Runbooks de operacao local
-│   ├── security/               # Arquitetura de seguranca
-│   ├── sequence-diagrams/      # Diagramas de sequencia
+│   ├── glossary/               # Glossário de domínio
+│   ├── prompts/                # Prompts para Codex/agents
+│   ├── reviews/                # Reviews e validações
+│   ├── runbooks/               # Runbooks de operação local
+│   ├── security/               # Arquitetura de segurança
+│   ├── sequence-diagrams/      # Diagramas de sequência
 │   └── services/               # Specs individuais de microservice
 ├── monitoring/                 # Prometheus/Grafana local
 ├── database/                   # Seed/schema local Postgres
@@ -41,49 +42,50 @@ logistica-envios-demo-arch
 └── AGENTS.md
 ```
 
-## Repositorios envolvidos
+## Repositórios envolvidos
 
 ### Canal e BFF
 
-| Componente | Repositorio | Responsabilidade |
+| Componente | Repositório | Responsabilidade |
 |---|---|---|
-| Frontend | [MarketplaceWeb](https://github.com/leandrosflora/MarketplaceWeb) | Experiencia web do marketplace e telas operacionais. |
-| BFF | [MarketplaceWeb.Bff](https://github.com/leandrosflora/MarketplaceWeb.Bff) | Agregacao para o canal web e chamadas aos microservices. |
+| Frontend | [MarketplaceWeb](https://github.com/leandrosflora/MarketplaceWeb) | Experiência web do marketplace e telas operacionais. |
+| BFF | [MarketplaceWeb.Bff](https://github.com/leandrosflora/MarketplaceWeb.Bff) | Agregação para o canal web, carrinho em Redis, chamadas aos microservices e publicação de `cart.abandoned`. |
 
 ### Microservices implementados
 
-| Microservice | Repositorio | Responsabilidade pratica |
+| Microservice | Repositório | Responsabilidade prática |
 |---|---|---|
 | Product Search Service | [ProductSearchService](https://github.com/leandrosflora/ProductSearchService) | Busca produtos ativos em read model Postgres para alimentar BFF/frontend. |
-| Checkout Service | [CheckoutService](https://github.com/leandrosflora/CheckoutService) | Cria, consulta e confirma sessoes de checkout; publica eventos de checkout. |
-| Shipping Promise Service | [ShippingPromiseService](https://github.com/leandrosflora/ShippingPromiseService) | Calcula promessa de entrega via APIs de catalogo, estoque, fulfillment, rota, carrier e pricing. |
-| Product Catalog Service | [ProductCatalogService](https://github.com/leandrosflora/ProductCatalogService) | Expoe atributos logisticos de SKU. |
+| Checkout Service | [CheckoutService](https://github.com/leandrosflora/CheckoutService) | Cria, consulta e confirma sessões de checkout; publica eventos de checkout. |
+| Shipping Promise Service | [ShippingPromiseService](https://github.com/leandrosflora/ShippingPromiseService) | Calcula promessa de entrega via APIs de catálogo, estoque, fulfillment, rota, carrier e pricing. |
+| Product Catalog Service | [ProductCatalogService](https://github.com/leandrosflora/ProductCatalogService) | Expõe atributos logísticos de SKU. |
 | Inventory Service | [InventoryService](https://github.com/leandrosflora/InventoryService) | Consulta disponibilidade e gerencia reservas de estoque. |
 | Fulfillment Center Service | [FulfillmentCenterService](https://github.com/leandrosflora/FulfillmentCenterService) | Gerencia centros, capacidade, status e reservas operacionais. |
-| Routing Service | [RoutingService](https://github.com/leandrosflora/RoutingService) | Calcula rotas logisticas e mantem grafo de malha. |
-| Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Gerencia transportadoras, niveis de servico, lanes e disponibilidade. |
+| Routing Service | [RoutingService](https://github.com/leandrosflora/RoutingService) | Calcula rotas logísticas e mantém grafo de malha. |
+| Carrier Service | [CarrierService](https://github.com/leandrosflora/CarrierService) | Gerencia transportadoras, níveis de serviço, lanes e disponibilidade. |
 | Shipping Pricing Service | [ShippingPricingService](https://github.com/leandrosflora/ShippingPricingService) | Calcula frete, quotes e rate cards. |
 | Order Service | [OrderService](https://github.com/leandrosflora/OrderService) | Cria pedido a partir de `checkout.confirmed` e orquestra a saga por Kafka/outbox. |
-| Payment Service | [PaymentService](https://github.com/leandrosflora/PaymentService) | Consome `payment.commands` e publica eventos de autorizacao/captura de pagamento com gateway mock deterministico. |
+| Payment Service | [PaymentService](https://github.com/leandrosflora/PaymentService) | Consome `payment.commands` e publica eventos de autorização/captura de pagamento com gateway mock determinístico. |
 | Shipment Service | [ShipmentService](https://github.com/leandrosflora/ShipmentService) | Cria shipment, pacotes, etiqueta e comandos para carrier. |
-| Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Mantem timeline/status de entrega e publica atualizacoes de tracking. |
-| Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Planeja e envia notificacoes Email/SMS/Push com preferencias e receipts. |
-| Audit Service | [AuditService](https://github.com/leandrosflora/AuditService) | Consome eventos canonicos com producer real e persiste auditoria imutavel. |
-| Order Visibility Service | [OrderVisibilityService](https://github.com/leandrosflora/OrderVisibilityService) | Consome eventos da jornada, materializa timeline/status operacional e expoe REST + SignalR. |
+| Tracking Service | [TrackingService](https://github.com/leandrosflora/TrackingService) | Mantém timeline/status de entrega e publica atualizações de tracking. |
+| Notification Service | [NotificationService](https://github.com/leandrosflora/NotificationService) | Planeja e envia notificações Email/SMS/Push com preferências e receipts. |
+| Audit Service | [AuditService](https://github.com/leandrosflora/AuditService) | Consome eventos canônicos com producer real e persiste auditoria imutável. |
+| Order Visibility Service | [OrderVisibilityService](https://github.com/leandrosflora/OrderVisibilityService) | Consome eventos da jornada, materializa timeline/status operacional e expõe REST + SignalR. |
 
-### Dependencias externas ou pendentes
+### Dependências externas ou pendentes
 
-| Componente | Situacao |
+| Componente | Situação |
 |---|---|
-| Gateway/PSP de pagamento | Nao ha gateway real; `PaymentService` usa adapter mock. |
-| Integracao carrier shipment | `ShipmentService` escreve `carrier-shipment.commands`, mas nao ha consumer dedicado documentado neste conjunto. |
-| Eventos canonicos de ordem/cancelamento | `NotificationService` espera `order.confirmed`, `order.cancelled` e `shipment.cancelled`; os producers canonicos ainda nao estao implementados. |
+| Gateway/PSP de pagamento | Não há gateway real; `PaymentService` usa adapter mock determinístico. |
+| Integração carrier shipment | `ShipmentService` escreve `carrier-shipment.commands`, mas não há consumer dedicado documentado neste conjunto. |
+| Eventos canônicos de ordem/cancelamento | `NotificationService` espera `order.confirmed`, `order.cancelled` e `shipment.cancelled`; os producers canônicos ainda não estão implementados. |
+| Carrinho abandonado anônimo | `MarketplaceWeb.Bff` pode publicar `cart.abandoned` com `buyerId = null`; `NotificationService` consome sem envio por falta de destinatário conhecido. |
 
-## Specs de servicos
+## Specs de serviços
 
-Documentacao detalhada por microservice em [`docs/services/`](docs/services/).
+Documentação detalhada por microservice em [`docs/services/`](docs/services/).
 
-| Servico | Spec |
+| Serviço | Spec |
 |---|---|
 | Product Search Service | [spec](docs/services/product-search-service.md) |
 | Checkout Service | [spec](docs/services/checkout-service.md) |
@@ -102,7 +104,7 @@ Documentacao detalhada por microservice em [`docs/services/`](docs/services/).
 | Audit Service | [spec](docs/services/audit-service.md) |
 | Order Visibility Service | [spec](docs/services/order-visibility-service.md) |
 
-## Kafka em pratica
+## Kafka em prática
 
 Contrato consolidado: [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md).
 
@@ -110,15 +112,16 @@ Contrato consolidado: [`docs/contracts/kafka-events.md`](docs/contracts/kafka-ev
 |---|---|
 | Checkout -> Shipping Promise -> Checkout | Implementado com `checkout.shipping.quote.requested` e `shipping.promise.calculated`. |
 | Checkout Confirmed -> Order | Implementado com `checkout.confirmed`. |
-| Order -> Inventory/Fulfillment | Implementado com `inventory.commands`, `fulfillment.commands` e eventos de reserva/confirmacao/falha. |
+| Order -> Inventory/Fulfillment | Implementado com `inventory.commands`, `fulfillment.commands` e eventos de reserva/confirmação/falha. |
 | Order -> Payment -> Order | Implementado com `payment.commands`, `payment.approved`, `payment.rejected`, `payment.captured` e `payment.capture.failed`. |
 | Order -> Shipment -> Tracking | Implementado com `shipment.commands`, `shipment.created`, `shipment.creation.failed` e `shipment.status.updated`. |
-| Notification | Parcial: consome eventos reais como `order.created`, `payment.rejected`, `shipment.created` e `shipment.status.updated`, mas tambem configura topicos sem producer canonico atual. |
-| Audit | Implementado como consumer-only dos dez eventos canonicos com producer real. |
-| Order Visibility | Implementado como consumer-only dos fatos da jornada; nao consome topicos `*.commands` e nao publica Kafka. |
-| Carrier shipment | Pendente: `carrier-shipment.commands` e produzido, mas nao ha consumer dedicado no conjunto atual. |
+| Cart abandonment | Implementado com `cart.abandoned`, produzido diretamente pelo `MarketplaceWeb.Bff` e consumido pelo `NotificationService`. |
+| Notification | Parcial: consome eventos reais como `order.created`, `payment.rejected`, `shipment.created`, `shipment.status.updated` e `cart.abandoned`, mas também configura tópicos sem producer canônico atual. |
+| Audit | Implementado como consumer-only dos eventos canônicos com producer real. |
+| Order Visibility | Implementado como consumer-only dos fatos da jornada; não consome tópicos `*.commands` e não publica Kafka. |
+| Carrier shipment | Pendente: `carrier-shipment.commands` é produzido, mas não há consumer dedicado no conjunto atual. |
 
-### Eventos canonicos auditados
+### Eventos canônicos auditados
 
 `AuditService` consome:
 
@@ -133,21 +136,34 @@ Contrato consolidado: [`docs/contracts/kafka-events.md`](docs/contracts/kafka-ev
 - `shipment.created`
 - `shipment.status.updated`
 
-### Topicos internos ou pendentes
+### Tópicos internos, efêmeros ou pendentes
 
-| Topico | Situacao |
+| Tópico | Situação |
 |---|---|
 | `inventory.commands` | Comando interno da saga, produzido por `OrderService` e consumido por `InventoryService`. |
 | `fulfillment.commands` | Comando interno da saga, produzido por `OrderService` e consumido por `FulfillmentCenterService`. |
 | `payment.commands` | Comando interno da saga, produzido por `OrderService` e consumido por `PaymentService`. |
 | `shipment.commands` | Comando interno da saga, produzido por `OrderService` e consumido por `ShipmentService`. |
-| `order.events` | Topico interno/controlado do `OrderService` para confirmacao/cancelamento. |
+| `order.events` | Tópico interno/controlado do `OrderService` para confirmação/cancelamento. |
+| `cart.abandoned` | Evento de UX/retargeting produzido pelo BFF sem outbox; aceitável por ser dado efêmero de carrinho, não fato financeiro/logístico. |
 | `carrier-shipment.commands` | Produzido por `ShipmentService`; consumer dedicado pendente. |
-| `order.confirmed`, `order.cancelled`, `shipment.cancelled` | Configurados em consumidores de notificacao, mas sem producer canonico atual. |
+| `order.confirmed`, `order.cancelled`, `shipment.cancelled` | Configurados em consumidores de notificação, mas sem producer canônico atual. |
 
 ## Fluxos principais
 
-### Promise assincrona
+### Descoberta de produto e carrinho
+
+```text
+MarketplaceWeb
+  -> MarketplaceWeb.Bff
+  -> ProductSearchService
+  -> MarketplaceWeb.Bff
+  -> Redis cart:<cartOwnerId>
+  -> cart.abandoned
+  -> NotificationService
+```
+
+### Promise assíncrona
 
 ```text
 CheckoutService
@@ -182,16 +198,16 @@ CheckoutService
 
 ## Dados e bancos
 
-Matriz canonica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md).
+Matriz canônica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md).
 
-| Recurso | Convencao pratica |
+| Recurso | Convenção prática |
 |---|---|
 | Postgres local | Banco compartilhado por schemas/connections conforme ownership de cada microservice. |
-| Redis | Usado apenas por servicos que registram Redis no bootstrap. |
-| Kafka | Eventos e comandos conforme implementacao atual. |
-| Outbox | Usado nos produtores de eventos/comandos quando implementado. |
-| Inbox | Usado nos consumidores para idempotencia quando implementado. |
-| SignalR | Usado pelo `OrderVisibilityService` para atualizacao operacional em tempo real. |
+| Redis | Cache local para serviços que registram Redis no bootstrap; também usado pelo BFF para carrinho efêmero com chave `cart:<cartOwnerId>`. |
+| Kafka | Eventos e comandos conforme implementação atual. |
+| Outbox | Usado nos produtores de eventos/comandos quando implementado. Não é usado para `cart.abandoned`. |
+| Inbox | Usado nos consumidores para idempotência quando implementado. |
+| SignalR | Usado pelo `OrderVisibilityService` para atualização operacional em tempo real. |
 
 ## Contratos
 
@@ -203,7 +219,7 @@ Matriz canonica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md
 - [`docs/contracts/kafka-events.md`](docs/contracts/kafka-events.md)
 - [`docs/contracts/kafka-schema-governance.md`](docs/contracts/kafka-schema-governance.md)
 
-## Seguranca
+## Segurança
 
 - [`docs/security/security-architecture.md`](docs/security/security-architecture.md)
 
@@ -216,7 +232,7 @@ Matriz canonica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md
 - Fonte: [`docs/c4/logistica-envios-container.puml`](docs/c4/logistica-envios-container.puml)
 - Imagem: [`docs/c4/logistica-envios-container.svg`](docs/c4/logistica-envios-container.svg)
 
-> Os SVGs podem ser regenerados pelo workflow de renderizacao.
+> Os SVGs podem ser regenerados pelo workflow de renderização.
 
 ## ADRs
 
@@ -228,13 +244,13 @@ Matriz canonica: [`docs/contracts/data-stores.md`](docs/contracts/data-stores.md
 - [`docs/adr/0006-observability-stack.md`](docs/adr/0006-observability-stack.md)
 - [`docs/adr/0007-order-service-internal-saga-topics.md`](docs/adr/0007-order-service-internal-saga-topics.md)
 
-## Runbooks e revisoes
+## Runbooks e revisões
 
 - [`docs/runbooks/kafka-local-e2e.md`](docs/runbooks/kafka-local-e2e.md)
 - [`docs/runbooks/observability-local.md`](docs/runbooks/observability-local.md)
 - [`docs/runbooks/order-visibility-local.md`](docs/runbooks/order-visibility-local.md)
-- Historico: [`docs/reviews/microservices-code-alignment-2026-06-25.md`](docs/reviews/microservices-code-alignment-2026-06-25.md). A leitura sobre `PaymentService` e `AuditService` foi superada pela implementacao atual.
+- Histórico: [`docs/reviews/microservices-code-alignment-2026-06-25.md`](docs/reviews/microservices-code-alignment-2026-06-25.md). A leitura sobre `PaymentService` e `AuditService` foi superada pela implementação atual.
 
-## Licenca
+## Licença
 
-Este repositorio esta licenciado sob a **Apache License 2.0**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
+Este repositório está licenciado sob a **Apache License 2.0**. Consulte o arquivo [LICENSE](LICENSE) para detalhes.
