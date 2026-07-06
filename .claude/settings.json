@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C \"c:/Users/1513 X-MXTI/source/repos/meli/meli-envios-architecture\" checkout -b docs/architecture-quality-improvements)",
-      "Bash(git -C \"c:/Users/1513 X-MXTI/source/repos/meli/meli-envios-architecture\" add .github/workflows/patch-openapi-label-contract.yml README.md docker-compose.yml docs/adr/0002-saga-orchestrator-pattern.md docs/adr/0007-order-service-internal-saga-topics.md docs/cicd/pipeline.md docs/contracts/kafka-events.md docs/contracts/kafka-schema-governance.md docs/contracts/logistica-envios-apis.openapi.yaml docs/contracts/services-map.md docs/devops/ci-cd.md docs/devops/deployment.md docs/glossary/domain-glossary.md docs/reviews/kafka-e2e-contract-review-2026-06-14.md docs/runbooks/kafka-local-e2e.md docs/sequence-diagrams/02-checkout-confirmation-and-order-created.puml docs/sequence-diagrams/README.md docs/services/checkout-service.md docs/services/fulfillment-center-service.md docs/services/inventory-service.md docs/services/order-service.md docs/services/shipment-service.md)"
-    ]
-  }
-}
