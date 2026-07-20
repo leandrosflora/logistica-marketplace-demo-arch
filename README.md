@@ -1,5 +1,10 @@
 # Logistica Marketplace Demo Architecture
 
+[![Documentation](https://img.shields.io/badge/docs-MkDocs-526CFE?logo=materialformkdocs&logoColor=white)](https://leandrosflora.github.io/logistica-marketplace-demo-arch/)
+[![Publish MkDocs](https://github.com/leandrosflora/logistica-marketplace-demo-arch/actions/workflows/docs.yml/badge.svg)](https://github.com/leandrosflora/logistica-marketplace-demo-arch/actions/workflows/docs.yml)
+
+**Documentação publicada:** https://leandrosflora.github.io/logistica-marketplace-demo-arch/
+
 Repositório de arquitetura e documentação do case **Logística Marketplace Demo**.
 
 ## Estado atual
