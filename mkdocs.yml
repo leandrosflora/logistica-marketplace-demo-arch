@@ -160,14 +160,14 @@ nav:
       - Security: security/security-architecture.md
       - Glossary: glossary/domain-glossary.md
       - C4 diagrams:
-          - Context: c4/logistica-envios-context.svg
-          - Containers: c4/logistica-envios-container.svg
-          - Checkout: c4/logistica-envios-checkout-domain-level3.svg
-          - Order: c4/logistica-envios-order-domain-level3.svg
-          - Order saga: c4/logistica-envios-order-saga-level3.svg
-          - Shipping promise: c4/logistica-envios-shipping-promise-domain-level3.svg
-          - Shipment: c4/logistica-envios-shipment-domain-level3.svg
-          - Tracking: c4/logistica-envios-tracking-domain-level3.svg
+          - Context: c4/logistica-envios-context.en.svg
+          - Containers: c4/logistica-envios-container.en.svg
+          - Checkout: c4/logistica-envios-checkout-domain-level3.en.svg
+          - Order: c4/logistica-envios-order-domain-level3.en.svg
+          - Order saga: c4/logistica-envios-order-saga-level3.en.svg
+          - Shipping promise: c4/logistica-envios-shipping-promise-domain-level3.en.svg
+          - Shipment: c4/logistica-envios-shipment-domain-level3.en.svg
+          - Tracking: c4/logistica-envios-tracking-domain-level3.en.svg
   - Contracts:
       - Overview: contracts/README.md
       - REST APIs: contracts/api-contract-validation.md
