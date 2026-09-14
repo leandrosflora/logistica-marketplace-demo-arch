@@ -46,10 +46,19 @@ jobs:
           done
 
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -v "$PWD:/work" \
             plantuml/plantuml:latest \
             -tsvg \
             "${container_paths[@]}"
+
+          for diagram in "${diagrams[@]}"; do
+            svg="${diagram%.puml}.svg"
+            if [ ! -s "$svg" ]; then
+              echo "::error::Missing generated SVG: $svg"
+              exit 1
+            fi
+          done
 
       - name: Show generated diagram changes
         run: |
@@ -79,5 +88,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git commit -m "chore: render PlantUML diagrams [skip ci]"
+          git commit -m "chore: render PlantUML diagrams"
           git push
