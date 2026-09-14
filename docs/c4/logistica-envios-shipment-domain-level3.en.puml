@@ -1,0 +1,53 @@
+@startuml
+' C4 Level 3 - Shipment domain
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logistics Marketplace - C4 Level 3 - Shipment Domain and Kafka
+caption Focus on physical delivery creation from order.created and publication of shipment.created.
+
+System_Ext(carrier, "Carrier", "External logistics operator")
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+  Component(kafka, "Kafka Cluster", "Kafka", "Asynchronous event backbone")
+  Component(orderCreatedTopic, "Topic: order.created", "Kafka Topic", "Event published by Order Service")
+  Component(shipmentCreatedTopic, "Topic: shipment.created", "Kafka Topic", "Event published by Shipment Service")
+
+  Component(order, "Order Service", ".NET 8", "Publishes created order")
+  Component(shipment, "Shipment Service", ".NET 8", "Creates shipment, package, label and tracking code")
+  Component(shipmentDb, "Shipment DB", "Database", "Persists shipment, packages and label")
+  Component(tracking, "Tracking Service", ".NET 8", "Consumes created shipment to start tracking")
+  Component(notification, "Notification Service", ".NET 8", "Consumes created shipment to notify buyer/seller")
+  Component(audit, "Audit Service", "Event Consumer", "Consumes events for auditing")
+}
+
+Rel(order, kafka, "Publishes", "Kafka producer")
+Rel(kafka, orderCreatedTopic, "Stores", "topic")
+Rel(orderCreatedTopic, shipment, "Consumes order.created", "Kafka consumer")
+Rel(shipment, shipmentDb, "Persists shipment, package and label", "SQL/NoSQL")
+Rel(shipment, carrier, "Requests booking/label", "HTTP/external API")
+Rel(carrier, shipment, "Returns tracking code and label", "HTTP/JSON")
+Rel(shipment, kafka, "Publishes", "Kafka producer")
+Rel(kafka, shipmentCreatedTopic, "Stores", "topic")
+Rel(shipmentCreatedTopic, tracking, "Consumes", "Kafka consumer")
+Rel(shipmentCreatedTopic, notification, "Consumes", "Kafka consumer")
+Rel(shipmentCreatedTopic, audit, "Consumes", "Kafka consumer")
+
+note right of shipment
+Shipment Service owns the physical delivery lifecycle:
+- creates shipment
+- creates package/volume
+- generates label
+- obtains tracking code
+- publishes shipment.created
+end note
+
+note bottom of shipmentCreatedTopic
+Contract documented at:
+docs/contracts/kafka-events.md
+- Published by: shipment-service
+- Consumed by: tracking-service, notification-service, audit-service
+end note
+
+@enduml
