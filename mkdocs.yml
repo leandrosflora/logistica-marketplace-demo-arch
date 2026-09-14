@@ -159,6 +159,7 @@ nav:
       - Data and ownership: contracts/data-stores.md
       - Security: security/security-architecture.md
       - Glossary: glossary/domain-glossary.md
+      # English navigation uses language-specific C4 SVG assets.
       - C4 diagrams:
           - Context: c4/logistica-envios-context.en.svg
           - Containers: c4/logistica-envios-container.en.svg
