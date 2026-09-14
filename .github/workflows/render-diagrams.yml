@@ -33,12 +33,23 @@ jobs:
 
       - name: Render C4-PlantUML and sequence diagrams as SVG
         run: |
+          mapfile -t diagrams < <(find docs/c4 docs/sequence-diagrams -type f -name '*.puml' | sort)
+
+          if [ "${#diagrams[@]}" -eq 0 ]; then
+            echo "No PlantUML diagrams found."
+            exit 0
+          fi
+
+          container_paths=()
+          for diagram in "${diagrams[@]}"; do
+            container_paths+=("/work/$diagram")
+          done
+
           docker run --rm \
             -v "$PWD:/work" \
             plantuml/plantuml:latest \
             -tsvg \
-            /work/docs/c4/*.puml \
-            /work/docs/sequence-diagrams/*.puml
+            "${container_paths[@]}"
 
       - name: Show generated diagram changes
         run: |
