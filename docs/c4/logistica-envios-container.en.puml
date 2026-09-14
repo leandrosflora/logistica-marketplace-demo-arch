@@ -1,0 +1,84 @@
+@startuml
+' Rendered by .github/workflows/render-diagrams.yml using C4-PlantUML.
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Logistics Marketplace - C4 Level 2 - Containers (current implementation)
+
+Person(buyer, "Buyer")
+Person(operator, "Operations / Support")
+System_Ext(paymentProvider, "External / simulated payment provider", "Pending dependency responsible for consuming payment.commands")
+System_Ext(carrierProvider, "External carriers", "Postal services, last-mile providers and logistics partners")
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+  Container(bff, "Marketplace BFF", ".NET 8", "Aggregates data for the frontend.")
+  Container(productSearch, "Product Search Service", ".NET 8", "Searches active products in a Postgres read model.")
+  Container(checkout, "Checkout Service", ".NET 8", "Creates, retrieves and confirms checkout sessions.")
+  Container(promise, "Shipping Promise Service", ".NET 8", "Calculates ETA, availability, shipping mode and price.")
+  Container(catalog, "Product Catalog Service", ".NET 8", "Exposes SKU logistics attributes.")
+  Container(inventory, "Inventory Service", ".NET 8", "Inventory availability, reservation, confirmation and release.")
+  Container(fc, "Fulfillment Center Service", ".NET 8", "Fulfillment center capacity, cutoff, operations and reservations.")
+  Container(routing, "Routing Service", ".NET 8", "Calculates routes and maintains the logistics graph.")
+  Container(carrier, "Carrier Service", ".NET 8", "Manages carriers, service levels, lanes and availability.")
+  Container(pricing, "Shipping Pricing Service", ".NET 8", "Calculates shipping prices, quotes and rate cards.")
+  Container(order, "Order Service", ".NET 8", "Maintains orders and orchestrates the saga through Outbox/Kafka.")
+  Container(shipment, "Shipment Service", ".NET 8", "Creates shipments, packages, labels and carrier commands.")
+  Container(tracking, "Tracking Service", ".NET 8", "Maintains delivery timeline and status.")
+  Container(notification, "Notification Service", ".NET 8", "Plans and sends Email/SMS/Push notifications.")
+  Container(orderVisibility, "Order Visibility Service", ".NET 8", "Passive journey consumer; maintains status/timeline read models and serves the Order Monitor screen through REST + SignalR.")
+
+  ContainerDb(kafka, "Kafka", "Event Streaming", "Implemented events, internal commands and pending saga topics.")
+  ContainerDb(postgres, "Postgres / RDS", "Relational DB", "Schemas/connections per microservice according to the codebase.")
+  ContainerDb(redis, "Redis", "Cache", "Used by Shipping Promise, Catalog, Routing, Carrier and Pricing.")
+  ContainerDb(labelStorage, "Label Storage", "Local FileSystem", "Stores/exposes shipment labels in the demo environment.")
+}
+
+Rel(buyer, bff, "Uses")
+Rel(operator, orderVisibility, "Checks order status/timeline and real-time updates through REST + SignalR (Order Monitor screen)")
+Rel(bff, productSearch, "Searches products")
+Rel(bff, checkout, "Creates/retrieves/confirms checkout")
+Rel(checkout, promise, "Requests HTTP quote")
+Rel(promise, catalog, "Reads attributes")
+Rel(promise, inventory, "Checks inventory")
+Rel(promise, fc, "Checks capacity")
+Rel(promise, routing, "Calculates route")
+Rel(promise, carrier, "Checks restrictions/availability")
+Rel(promise, pricing, "Calculates price")
+
+Rel(checkout, kafka, "Publishes checkout.shipping.quote.requested / checkout.confirmed; consumes shipping.promise.calculated")
+Rel(promise, kafka, "Consumes checkout.shipping.quote.requested; publishes shipping.promise.calculated")
+Rel(order, kafka, "Consumes checkout/inventory/fulfillment/shipment/status; publishes order.created and commands")
+Rel(inventory, kafka, "Consumes inventory.commands; publishes reservation events")
+Rel(fc, kafka, "Consumes fulfillment.commands; publishes capacity events")
+Rel(shipment, kafka, "Consumes order.created/shipment.commands; publishes shipment.created")
+Rel(tracking, kafka, "Consumes shipment.created; publishes shipment.status.updated")
+Rel(notification, kafka, "Consumes events configured for notification")
+Rel(orderVisibility, kafka, "Consumes checkout.confirmed/order.created and inventory/fulfillment/payment/shipment/tracking events; does not publish")
+Rel(order, paymentProvider, "Emits payment.commands; production consumer not implemented")
+
+Rel(carrier, carrierProvider, "Checks availability")
+Rel(shipment, carrierProvider, "Registers shipment and generates label")
+Rel(tracking, carrierProvider, "Receives tracking events")
+
+Rel(productSearch, postgres, "Reads product read model")
+Rel(checkout, postgres, "Reads/writes CheckoutDb")
+Rel(promise, postgres, "Reads/writes ShippingPromiseDb")
+Rel(catalog, postgres, "Reads/writes Product Catalog")
+Rel(inventory, postgres, "Reads/writes InventoryDb")
+Rel(fc, postgres, "Reads/writes FulfillmentDb")
+Rel(routing, postgres, "Reads/writes RoutingDb when not mocked")
+Rel(carrier, postgres, "Reads/writes CarrierDb")
+Rel(pricing, postgres, "Reads/writes PricingDb")
+Rel(order, postgres, "Reads/writes OrderDb")
+Rel(shipment, postgres, "Reads/writes ShipmentDb")
+Rel(tracking, postgres, "Reads/writes TrackingDb")
+Rel(notification, postgres, "Reads/writes NotificationDb")
+Rel(orderVisibility, postgres, "Reads/writes order_visibility (order_journey, order_journey_events)")
+
+Rel(promise, redis, "Shipping-promise cache")
+Rel(catalog, redis, "Attribute cache")
+Rel(routing, redis, "Route cache")
+Rel(carrier, redis, "Carrier cache")
+Rel(pricing, redis, "Pricing cache")
+Rel(shipment, labelStorage, "Generates temporary label URLs")
+
+@enduml
