@@ -1,0 +1,54 @@
+@startuml
+' C4 Level 3 - Tracking domain
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logistics Marketplace - C4 Level 3 - Tracking Domain and Kafka
+caption Focus on creating the tracking projection and publishing shipment.status.updated.
+
+System_Ext(carrier, "Carrier", "Sends tracking events")
+Person(buyer, "Buyer", "Receives delivery updates")
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+  Component(kafka, "Kafka Cluster", "Kafka", "Asynchronous event backbone")
+  Component(shipmentCreatedTopic, "Topic: shipment.created", "Kafka Topic", "Shipment created by the shipping domain")
+  Component(statusUpdatedTopic, "Topic: shipment.status.updated", "Kafka Topic", "Consolidated tracking status")
+
+  Component(shipment, "Shipment Service", ".NET 8", "Publishes created shipment")
+  Component(tracking, "Tracking Service", ".NET 8", "Maintains tracking projection and event history")
+  Component(trackingDb, "Tracking DB", "Database", "Persists current status and timeline")
+  Component(notification, "Notification Service", ".NET 8", "Notifies buyer about status changes")
+  Component(order, "Order Service", ".NET 8", "Updates order view according to logistics status")
+  Component(audit, "Audit Service", "Event Consumer", "Records audit trail")
+}
+
+Rel(shipment, kafka, "Publishes", "Kafka producer")
+Rel(kafka, shipmentCreatedTopic, "Stores", "topic")
+Rel(shipmentCreatedTopic, tracking, "Consumes shipment.created", "Kafka consumer")
+Rel(tracking, trackingDb, "Creates initial tracking projection", "SQL/NoSQL")
+Rel(carrier, tracking, "Transport webhook/event", "HTTP/JSON")
+Rel(tracking, trackingDb, "Updates status and history", "SQL/NoSQL")
+Rel(tracking, kafka, "Publishes", "Kafka producer")
+Rel(kafka, statusUpdatedTopic, "Stores", "topic")
+Rel(statusUpdatedTopic, notification, "Consumes", "Kafka consumer")
+Rel(statusUpdatedTopic, order, "Consumes", "Kafka consumer")
+Rel(statusUpdatedTopic, audit, "Consumes", "Kafka consumer")
+Rel(notification, buyer, "Sends update", "Push/email/SMS")
+
+note right of tracking
+Tracking Service owns the logistics projection:
+- consumes shipment.created
+- receives carrier events
+- consolidates current status
+- publishes shipment.status.updated
+end note
+
+note bottom of statusUpdatedTopic
+Contract documented at:
+docs/contracts/kafka-events.md
+- Published by: tracking-service
+- Consumed by: notification-service, audit-service, order-service
+end note
+
+@enduml
