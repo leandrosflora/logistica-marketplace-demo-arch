@@ -1,0 +1,74 @@
+@startuml
+' C4 Level 3 - Shipping Promise domain (synchronous quote flow)
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logistics Marketplace - C4 Level 3 - Shipping Promise Domain (Synchronous Quote)
+caption Focus on ShippingPromiseService synchronous dependencies used to calculate the delivery promise.
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+
+  Container_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
+    Component(promiseController, "ShippingPromiseController", "ASP.NET Core Controller", "Exposes POST /v1/shipping-promises (synchronous fallback)")
+    Component(promiseConsumer, "KafkaQuoteConsumer", "Infrastructure", "Consumes checkout.shipping.quote.requested from Kafka")
+    Component(promiseApp, "ShippingPromiseCalculator", "Application Service", "Orchestrates synchronous calls and composes the delivery promise")
+    Component(promiseDomain, "ShippingPromise (Aggregate)", "Domain Entity", "Promise with ETA, shipping mode, carrier and cost")
+    Component(promisePublisher, "KafkaPromisePublisher", "Infrastructure", "Publishes shipping.promise.calculated to Kafka")
+    Component(circuitBreakers, "CircuitBreakerPolicies", "Infrastructure", "Circuit-breaker policies per dependency (Polly)")
+  }
+
+  Component(catalogClient, "ProductCatalogClient", "HTTP Client", "GET /v1/products/{skuId}/logistics")
+  Component(inventoryClient, "InventoryClient", "HTTP Client", "GET /v1/inventory/{skuId}/availability")
+  Component(fulfillmentClient, "FulfillmentCenterClient", "HTTP Client", "GET /v1/fulfillment-centers/{fcId}/availability")
+  Component(routingClient, "RoutingClient", "HTTP Client", "POST /v1/routes/calculate")
+  Component(carrierClient, "CarrierClient", "HTTP Client", "POST /v1/carriers/options")
+  Component(pricingClient, "ShippingPricingClient", "HTTP Client", "POST /v1/pricing/freight")
+
+  System_Ext(catalogService, "Product Catalog Service", "Provides product weight, dimensions and restrictions")
+  System_Ext(inventoryService, "Inventory Service", "Checks inventory availability")
+  System_Ext(fulfillmentService, "Fulfillment Center Service", "Provides fulfillment center capacity and cutoff")
+  System_Ext(routingService, "Routing Service", "Calculates logistics route and SLA")
+  System_Ext(carrierService, "Carrier Service", "Lists available carrier options")
+  System_Ext(pricingService, "Shipping Pricing Service", "Calculates shipping cost and subsidies")
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Asynchronous backbone")
+}
+
+Rel(promiseConsumer, promiseApp, "CalculatePromise(request)")
+Rel(promiseController, promiseApp, "CalculatePromise(request)")
+Rel(promiseApp, circuitBreakers, "Uses Polly policies")
+Rel(promiseApp, catalogClient, "GetProductLogistics(skuId)")
+Rel(promiseApp, inventoryClient, "CheckAvailability(skuId, sellerId, fcId)")
+Rel(promiseApp, fulfillmentClient, "CheckCapacity(fcId, window)")
+Rel(promiseApp, routingClient, "CalculateRoute(origin, destination, mode)")
+Rel(promiseApp, carrierClient, "GetCarrierOptions(routeId, package)")
+Rel(promiseApp, pricingClient, "CalculateFreight(routeId, carrierId, package)")
+Rel(promiseApp, promiseDomain, "Creates ShippingPromise with consolidated result")
+Rel(promiseApp, promisePublisher, "PublishPromiseCalculated(promise)")
+Rel(promisePublisher, kafka, "Publishes shipping.promise.calculated", "Kafka producer")
+
+Rel(catalogClient, catalogService, "HTTP GET", "x-correlation-id propagated")
+Rel(inventoryClient, inventoryService, "HTTP GET", "x-correlation-id propagated")
+Rel(fulfillmentClient, fulfillmentService, "HTTP GET", "x-correlation-id propagated")
+Rel(routingClient, routingService, "HTTP POST", "x-correlation-id propagated")
+Rel(carrierClient, carrierService, "HTTP POST", "x-correlation-id propagated")
+Rel(pricingClient, pricingService, "HTTP POST", "x-correlation-id propagated")
+
+note right of circuitBreakers
+Circuit breaker applied per dependency.
+Timeout: 500ms per call.
+Fallback: degraded promise when a
+dependency is unavailable.
+end note
+
+note bottom of promiseDomain
+ShippingPromise contains:
+- promiseId
+- estimatedDeliveryDate
+- mode (same_day, next_day, standard)
+- carrier
+- cost (buyerCost, grossCost, subsidyAmount)
+end note
+
+@enduml
