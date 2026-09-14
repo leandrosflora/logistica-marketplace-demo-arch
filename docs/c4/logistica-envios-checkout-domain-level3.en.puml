@@ -1,0 +1,67 @@
+@startuml
+' C4 Level 3 - Checkout domain and asynchronous shipping promise
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logistics Marketplace - C4 Level 3 - Checkout Domain and Asynchronous Shipping Promise
+caption Asynchronous shipping quote flow through Kafka between CheckoutService and ShippingPromiseService.
+
+Person(buyer, "Buyer", "Starts the purchase process in the marketplace")
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+  Component(web, "Marketplace Web", "ASP.NET Core Razor", "Marketplace web channel")
+  Component(bff, "MarketplaceWeb.Bff", ".NET 8 BFF", "API tailored to the web experience; propagates x-correlation-id and x-client-id")
+
+  Container_Boundary(checkoutBound, "Checkout Service (.NET 8)") {
+    Component(checkoutController, "CheckoutController", "ASP.NET Core Controller", "Exposes POST /v1/checkouts and POST /v1/checkouts/{id}/confirm")
+    Component(checkoutApp, "CheckoutApplicationService", "Application Service", "Orchestrates checkout creation and confirmation")
+    Component(checkoutDomain, "Checkout (Aggregate)", "Domain Entity", "Checkout with status, items and associated delivery promise")
+    Component(checkoutRepo, "CheckoutRepository", "Infrastructure", "Persists checkout in Postgres")
+    Component(checkoutProducer, "KafkaCheckoutProducer", "Infrastructure", "Publishes checkout.shipping.quote.requested")
+    Component(checkoutConsumer, "KafkaPromiseConsumer", "Infrastructure", "Consumes shipping.promise.calculated and projects it into checkout")
+    Component(checkoutIdempotency, "IdempotencyMiddleware", "Infrastructure", "Deduplicates using x-idempotency-key in Redis")
+  }
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Asynchronous backbone")
+  Component(quoteTopic, "Topic: checkout.shipping.quote.requested", "Kafka Topic", "Shipping quote request")
+  Component(promiseTopic, "Topic: shipping.promise.calculated", "Kafka Topic", "Calculated delivery promise result")
+
+  Container_Boundary(promiseBound, "Shipping Promise Service (.NET 8)") {
+    Component(promiseConsumer, "KafkaQuoteConsumer", "Infrastructure", "Consumes checkout.shipping.quote.requested")
+    Component(promiseApp, "ShippingPromiseCalculator", "Application Service", "Orchestrates synchronous calls and calculates the delivery promise")
+    Component(promiseDomain, "ShippingPromise (Aggregate)", "Domain Entity", "Calculated promise with ETA, carrier and cost")
+    Component(promiseProducer, "KafkaPromisePublisher", "Infrastructure", "Publishes shipping.promise.calculated")
+  }
+}
+
+Rel(buyer, web, "Selects a product and starts checkout", "HTTPS")
+Rel(web, bff, "GET /api/web/v1/checkout", "HTTPS/JSON")
+Rel(bff, checkoutController, "POST /v1/checkouts", "HTTP/JSON\nx-correlation-id\nx-client-id\nx-idempotency-key")
+Rel(checkoutController, checkoutIdempotency, "Checks idempotency", "Redis")
+Rel(checkoutController, checkoutApp, "CreateCheckout(command)")
+Rel(checkoutApp, checkoutDomain, "Creates Checkout entity")
+Rel(checkoutApp, checkoutRepo, "Persists checkout", "Postgres")
+Rel(checkoutApp, checkoutProducer, "Publishes quote event")
+Rel(checkoutProducer, quoteTopic, "Publishes", "Kafka")
+Rel(quoteTopic, promiseConsumer, "Consumes", "Kafka consumer group: shipping-promise-service")
+Rel(promiseConsumer, promiseApp, "CalculatePromise(request)")
+Rel(promiseApp, promiseDomain, "Creates ShippingPromise")
+Rel(promiseApp, promiseProducer, "Publishes calculated promise")
+Rel(promiseProducer, promiseTopic, "Publishes", "Kafka")
+Rel(promiseTopic, checkoutConsumer, "Consumes", "Kafka consumer group: checkout-service")
+Rel(checkoutConsumer, checkoutRepo, "Updates checkout with delivery promise", "Postgres")
+
+note right of quoteTopic
+Payload includes: checkoutId, buyerId, sellerId,
+destination, items[].
+checkoutId enables asynchronous correlation.
+end note
+
+note right of promiseTopic
+Payload includes: checkoutId, promiseId, mode,
+carrier, estimatedDeliveryDate, cost, currency.
+checkoutId is required for correlation.
+end note
+
+@enduml
