@@ -1,0 +1,51 @@
+@startuml
+' C4 Level 3 - Order domain
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Logistics Marketplace - C4 Level 3 - Order Domain and Kafka
+caption Focus on the point where the journey leaves the synchronous checkout flow and starts publishing events to the shipping chain.
+
+Person(buyer, "Buyer", "Confirms the purchase in the marketplace")
+
+System_Boundary(platform, "Logistics & Shipping Platform") {
+  Component(web, "Marketplace Web", "ASP.NET Core Razor", "Web channel")
+  Component(bff, "MarketplaceWeb.Bff", ".NET 8 BFF", "API tailored to the web experience")
+  Component(checkout, "Checkout Service", ".NET 8", "Creates and confirms checkout")
+  Component(promise, "Shipping Promise Service", ".NET 8", "Calculates the delivery promise used during checkout")
+  Component(order, "Order Service", ".NET 8", "Creates the order after checkout confirmation")
+
+  Component(kafka, "Kafka Cluster", "Kafka", "Asynchronous event backbone")
+  Component(orderCreatedTopic, "Topic: order.created", "Kafka Topic", "Order created and ready for shipment creation")
+
+  Component(shipment, "Shipment Service", ".NET 8", "Consumes created orders to create physical delivery")
+  Component(notification, "Notification Service", ".NET 8", "Consumes created orders to notify buyer/seller")
+  Component(audit, "Audit Service", "Event Consumer", "Consumes events for traceability")
+}
+
+Rel(buyer, web, "Confirms purchase", "HTTPS")
+Rel(web, bff, "POST /api/web/v1/checkouts/{checkoutId}/confirm", "HTTPS/JSON")
+Rel(bff, checkout, "POST /checkouts/{checkoutId}/confirm", "HTTP/JSON")
+Rel(checkout, promise, "Revalidates delivery promise when required", "HTTP/JSON")
+Rel(checkout, order, "Requests order creation", "HTTP or internal event")
+Rel(order, kafka, "Publishes event", "Kafka producer")
+Rel(kafka, orderCreatedTopic, "Stores", "topic")
+Rel(orderCreatedTopic, shipment, "Consumes", "Kafka consumer")
+Rel(orderCreatedTopic, notification, "Consumes", "Kafka consumer")
+Rel(orderCreatedTopic, audit, "Consumes", "Kafka consumer")
+
+note right of order
+Order Service owns the order.created event.
+It does not create the shipment directly in the physical shipping domain;
+it only publishes the event for interested consumers.
+end note
+
+note bottom of orderCreatedTopic
+Contract documented at:
+docs/contracts/kafka-events.md
+- Published by: order-service
+- Consumed by: shipment-service, notification-service, audit-service
+end note
+
+@enduml
